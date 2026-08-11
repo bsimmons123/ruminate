@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pg from "pg";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -33,5 +34,8 @@ app.get("/api/kjv/book/:number", requireUser, async (req, res) => { try { const 
 app.get("/api/esv", requireUser, async (req, res) => { try { if (!process.env.ESV_API_KEY) return res.status(503).json({ error: "ESV_API_KEY is not configured." }); const query = String(req.query.q || ""); if (!/^.+\s\d+:\d+(?:-\d+)?$/.test(query)) return res.status(400).json({ error: "Use a single-chapter reference such as John 3:16-18." }); const { rows } = await pool.query("select count(*) filter (where requested_at > now() - interval '1 minute')::int as minute, count(*) filter (where requested_at > now() - interval '1 hour')::int as hour, count(*) filter (where requested_at > now() - interval '1 day')::int as day from esv_requests"); if (rows[0].minute >= 60 || rows[0].hour >= 1000 || rows[0].day >= 5000) return res.status(429).json({ error: "ESV request limit reached. Please try again later." }); await pool.query("insert into esv_requests default values"); const upstream = await fetch(`https://api.esv.org/v3/passage/text/?q=${encodeURIComponent(query)}&include-headings=false&include-footnotes=false&include-verse-numbers=false&include-passage-references=false&include-short-copyright=false`, { headers: { Authorization: `Token ${process.env.ESV_API_KEY}` } }); const data = await upstream.json(); res.status(upstream.status).json(upstream.ok ? { reference: data.canonical, text: data.passages?.[0] || "" } : { error: data.detail || "ESV request failed" }); } catch (error) { console.error("ESV route failed:", error instanceof Error ? error.message : error); res.status(500).json({ error: "ESV passage could not be loaded." }); } });
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."); app.use(express.static(path.join(root, "dist"))); app.use((_req, res) => res.sendFile(path.join(root, "dist", "index.html")));
-async function ensureCurrentSchema() { await pool.query(`create table if not exists community_collections (id text primary key,title text not null,description text not null,curator text not null,category text not null,verse_ids jsonb not null default '[]'::jsonb,featured boolean not null default false,created_at timestamptz not null default now())`); await pool.query(`insert into community_collections(id,title,description,curator,category,verse_ids,featured) values ('community-anxious-heart','For the Anxious Heart','Promises to return to when your thoughts feel heavy.','Grace Community','Peace','["php-4-6-7","ps-46-10","matt-11-28","isa-41-10"]',true),('community-first-verses','First Verses to Memorize','A welcoming starting point for building a Scripture-memory rhythm.','Selah Community','Foundations','["john-3-16","prov-3-5-6","ps-119-11","heb-11-1"]',true),('community-courage','Courage for the Week','Words of courage, trust, and purpose for uncertain days.','The Way Fellowship','Courage','["josh-1-9","isa-41-10","rom-8-28","prov-3-5-6"]',false) on conflict(id) do nothing`); }
+async function ensureCurrentSchema() {
+  const schema = await readFile(new URL("./schema.sql", import.meta.url), "utf8");
+  await pool.query(schema);
+}
 ensureCurrentSchema().then(() => app.listen(port, "0.0.0.0", () => console.log(`Selah listening on ${port}`))).catch(error => { console.error("Database connection failed", error); process.exit(1); });

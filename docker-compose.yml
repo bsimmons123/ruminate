@@ -8,7 +8,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-selah_local_password}
     volumes:
       - selah_postgres:/var/lib/postgresql/data
-      - ./server/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U selah -d selah"]
       interval: 5s

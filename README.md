@@ -47,7 +47,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Open `http://localhost:3001`. Docker Compose starts PostgreSQL 17, initializes the schema, waits for a healthy database, and then starts the application API and compiled web client. Database data is retained in the `selah_postgres` named volume.
+Open `http://localhost:3001`. Docker Compose starts PostgreSQL 17, waits for a healthy database, and then starts the application API and compiled web client. The application applies its idempotent schema on every startup, including when an existing database volume is empty or behind the current schema. Database data is retained in the `selah_postgres` named volume.
 
 On mobile, open Settings → Install Selah. Android browsers can show the native install prompt; on iPhone, use Safari’s Share → Add to Home Screen. The service worker caches only the application shell and static assets—authenticated API and ESV responses are explicitly excluded.
 
