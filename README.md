@@ -53,6 +53,24 @@ On mobile, open Settings → Install Selah. Android browsers can show the native
 
 Keep `COOKIE_SECURE=false` for local HTTP. Set it to `true` when deploying behind HTTPS. Always replace the example database password and JWT secret before exposing the application publicly.
 
+## GitHub Container Registry
+
+Pushes to `master` run CI and publish a multi-platform image to:
+
+```text
+ghcr.io/bsimmons123/selah:latest
+ghcr.io/bsimmons123/selah:sha-<commit>
+```
+
+Deploy the published image with:
+
+```bash
+docker compose -f compose.ghcr.yml pull
+docker compose -f compose.ghcr.yml up -d
+```
+
+Set `POSTGRES_PASSWORD`, `JWT_SECRET`, and optionally `ESV_API_KEY` in `.env`. Use `SELAH_TAG=sha-<commit>` to pin a deployment instead of following `latest`.
+
 For frontend development, run PostgreSQL and the API first, then use `npm run dev`; Vite proxies `/api` to port 3001.
 
 ## Enable ESV
