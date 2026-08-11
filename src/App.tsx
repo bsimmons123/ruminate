@@ -156,32 +156,32 @@ function App() {
 
   return (
     <div className="app-shell">
-      <header>
+      {page !== "reels" && <header>
         <button className="brand" onClick={() => navigate("home")}><span className="brand-mark">S</span><span>Selah<small>scripture memory</small></span></button>
         <nav className={menu ? "open" : ""}>
           <button className={page === "home" ? "active" : ""} onClick={() => navigate("home")}>Today</button>
-          <button className={page === "reels" ? "active" : ""} onClick={() => navigate("reels")}>Reels</button>
+          <button onClick={() => navigate("reels")}>Reels</button>
           <button className={page === "store" ? "active" : ""} onClick={() => navigate("store")}>Verse Store</button>
           <button className={page === "library" ? "active" : ""} onClick={() => navigate("library")}>My Library</button>
           <button className={page === "history" ? "active" : ""} onClick={() => navigate("history")}>Progress</button>
           <button className={page === "settings" ? "active" : ""} onClick={() => navigate("settings")}>Settings</button>
         </nav>
         <div className="header-actions"><button className="streak" title={streak ? `${streak} consecutive review ${streak === 1 ? "day" : "days"}` : "Complete a review to begin your streak"}><Flame size={16} /> {streak} {streak === 1 ? "day" : "days"}</button><button className="avatar" onClick={() => navigate("settings")}>{user.name.split(" ").map(part => part[0]).join("").slice(0,2).toUpperCase()}</button><button className="menu" onClick={() => setMenu(v => !v)}>{menu ? <X /> : <Menu />}</button></div>
-      </header>
+      </header>}
 
       <main>
         {page === "home" && <HomePage due={due.length} streak={streak} library={library} verseFor={verseFor} onReview={() => navigate("review")} onStore={() => navigate("store")} />}
-        {page === "reels" && <ReelsPage catalog={catalog} library={library} translation={settings?.translation || "KJV"} onPin={toggleVerse} onImport={importVerse} />}
+        {page === "reels" && <ReelsPage catalog={catalog} library={library} translation={settings?.translation || "KJV"} onBack={() => navigate("home")} onPin={toggleVerse} onImport={importVerse} />}
         {page === "store" && <StorePage filtered={filtered} topics={topics} topic={topic} query={query} library={library} preferredTranslation={settings?.translation || "KJV"} onQuery={setQuery} onTopic={setTopic} onToggle={toggleVerse} onCollection={addCollection} onImport={importVerse} />}
         {page === "library" && <LibraryPage library={library} verseFor={verseFor} onRemove={toggleVerse} onUpdate={updateLibraryItem} onReview={() => navigate("review")} onStore={() => navigate("store")} />}
         {page === "history" && <HistoryPage history={history} verseFor={verseFor} />}
         {page === "settings" && settings && <SettingsPage user={user} settings={settings} onSave={updateSettings} onSignOut={signOut} />}
         {page === "review" && <ReviewPage key={reviewItems[reviewIndex]?.verseId} items={reviewItems} index={reviewIndex} verse={reviewItems[reviewIndex] ? verseFor(reviewItems[reviewIndex].verseId) : undefined} onRate={rate} onClose={() => navigate("home")} />}
       </main>
-      <div className="esv-global"><strong>Noncommercial Scripture-memory project</strong><p>Scripture quotations marked “ESV” are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved. The ESV text may not be quoted in any publication made available to the public by a Creative Commons license. The ESV may not be translated into any other language.</p><p>Users may not copy or download more than 500 verses of the ESV Bible or more than one half of any book of the ESV Bible.</p><a href="https://www.esv.org/" target="_blank" rel="noreferrer">Read at ESV.org</a></div>
+      {page !== "reels" && <div className="esv-global"><strong>Noncommercial Scripture-memory project</strong><p>Scripture quotations marked “ESV” are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved. The ESV text may not be quoted in any publication made available to the public by a Creative Commons license. The ESV may not be translated into any other language.</p><p>Users may not copy or download more than 500 verses of the ESV Bible or more than one half of any book of the ESV Bible.</p><a href="https://www.esv.org/" target="_blank" rel="noreferrer">Read at ESV.org</a></div>}
       {!online && <div className="offline-badge"><WifiOff/> Offline — saved app screens remain available</div>}
 
-      {page !== "review" && <nav className="mobile-tabs"><button className={page === "home" ? "active" : ""} onClick={() => navigate("home")}><Home />Today</button><button className={page === "reels" ? "active" : ""} onClick={() => navigate("reels")}><Sparkles />Reels</button><button className={page === "store" ? "active" : ""} onClick={() => navigate("store")}><BookOpen />Store</button><button className={page === "library" ? "active" : ""} onClick={() => navigate("library")}><Library />Library</button><button className={page === "history" ? "active" : ""} onClick={() => navigate("history")}><BarChart3 />Progress</button></nav>}
+      {page !== "review" && page !== "reels" && <nav className="mobile-tabs"><button className={page === "home" ? "active" : ""} onClick={() => navigate("home")}><Home />Today</button><button onClick={() => navigate("reels")}><Sparkles />Reels</button><button className={page === "store" ? "active" : ""} onClick={() => navigate("store")}><BookOpen />Store</button><button className={page === "library" ? "active" : ""} onClick={() => navigate("library")}><Library />Library</button><button className={page === "history" ? "active" : ""} onClick={() => navigate("history")}><BarChart3 />Progress</button></nav>}
       {toast && <div className="toast"><Check size={17} />{toast}</div>}
     </div>
   );
@@ -217,24 +217,46 @@ function AuthPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }
 
 const reelReferences = ["Psalm 23:1-3", "Matthew 6:33-34", "Isaiah 40:31", "Romans 12:2", "Lamentations 3:22-23", "John 15:5", "Hebrews 12:1-2", "James 1:2-4"];
 
-function ReelsPage({ catalog, library, translation: preferred, onPin, onImport }: { catalog: Verse[]; library: LibraryItem[]; translation: "KJV" | "ESV"; onPin: (v: Verse) => void; onImport: (v: Verse) => Promise<void> }) {
+function freshReelBatch(source: Verse[], size = 12, previousId?: string) {
+  if (!source.length) return [];
+  const result: Verse[] = [];
+  while (result.length < size) {
+    const shuffled = [...source];
+    for (let index = shuffled.length - 1; index > 0; index--) {
+      const swap = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swap]] = [shuffled[swap], shuffled[index]];
+    }
+    if ((result.at(-1)?.id || previousId) === shuffled[0]?.id && shuffled.length > 1) [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+    result.push(...shuffled.slice(0, size - result.length));
+  }
+  return result;
+}
+
+function ReelsPage({ catalog, library, translation: preferred, onBack, onPin, onImport }: { catalog: Verse[]; library: LibraryItem[]; translation: "KJV" | "ESV"; onBack: () => void; onPin: (v: Verse) => void; onImport: (v: Verse) => Promise<void> }) {
   const [reelMode, setReelMode] = useState<"scripture" | "books">("scripture");
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [translation, setTranslation] = useState<"KJV" | "ESV">(preferred);
   const [remote, setRemote] = useState<Verse[]>([]); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
+  const [visibleFeed, setVisibleFeed] = useState<Verse[]>([]);
   const pinned = new Set(library.map(item => item.verseId));
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, []);
   useEffect(() => {
     if (reelMode !== "scripture" || translation !== "ESV" || remote.length) return;
     let cancelled = false; setLoading(true); setError("");
     (async () => { const loaded: Verse[] = []; for (const reference of reelReferences.slice(0, 5)) { try { loaded.push(await fetchPassage(reference, "ESV")); } catch (err) { if (!loaded.length) setError(err instanceof Error ? err.message : "ESV feed unavailable"); break; } } if (!cancelled) { setRemote(loaded); setLoading(false); } })();
     return () => { cancelled = true; };
   }, [reelMode, translation, remote.length]);
-  const feed = translation === "KJV" ? catalog.filter(v => v.translation === "KJV") : [...catalog.filter(v => v.translation === "ESV"), ...remote.filter(v => !catalog.some(c => c.id === v.id))];
+  const feed = useMemo(() => translation === "KJV" ? catalog.filter(v => v.translation === "KJV") : [...catalog.filter(v => v.translation === "ESV"), ...remote.filter(v => !catalog.some(c => c.id === v.id))], [translation, catalog, remote]);
+  useEffect(() => { setVisibleFeed(reelMode === "scripture" ? freshReelBatch(feed) : []); }, [feed, reelMode]);
   async function pin(verse: Verse) { try { if (catalog.some(v => v.id === verse.id)) await onPin(verse); else await onImport(verse); } catch (err) { setError(err instanceof Error ? err.message : "Could not pin passage"); } }
   return <div className="reels-page">
-    <div className="reels-toolbar"><div><span className="overline">Scripture reels</span><h1>{reelMode === "scripture" ? "Pause. Read. Keep." : selectedBook ? `Reading ${selectedBook}` : "The story, book by book."}</h1></div><div className="reels-controls"><div className="reel-mode"><button className={reelMode === "scripture" ? "active" : ""} onClick={() => { setReelMode("scripture"); setSelectedBook(null); }}>Scripture</button><button className={reelMode === "books" ? "active" : ""} onClick={() => setReelMode("books")}>Books</button></div>{reelMode === "scripture" && <label>Translation<select value={translation} onChange={e => { setTranslation(e.target.value as "KJV" | "ESV"); setError(""); }}><option>KJV</option><option>ESV</option><option disabled>More translations coming soon</option></select></label>}</div></div>
+    <div className="reels-toolbar"><button className="exit-reels" onClick={onBack} aria-label="Back to Selah"><ArrowLeft/><span>Back</span></button><div className="reels-title"><span className="overline">Scripture reels</span><h1>{reelMode === "scripture" ? "Pause. Read. Keep." : selectedBook ? `Reading ${selectedBook}` : "The story, book by book."}</h1></div><div className="reels-controls"><div className="reel-mode"><button className={reelMode === "scripture" ? "active" : ""} onClick={() => { setReelMode("scripture"); setSelectedBook(null); }}>Scripture</button><button className={reelMode === "books" ? "active" : ""} onClick={() => setReelMode("books")}>Books</button></div>{reelMode === "scripture" && <label>Translation<select value={translation} onChange={e => { setTranslation(e.target.value as "KJV" | "ESV"); setError(""); }}><option>KJV</option><option>ESV</option><option disabled>More translations coming soon</option></select></label>}</div></div>
     {error && reelMode === "scripture" && <div className="reel-message">{error}</div>}
-    {reelMode === "books" ? selectedBook ? <BookVerseReels book={selectedBook} pinned={pinned} onBack={() => setSelectedBook(null)} onPin={pin}/> : <BookReels onSelect={setSelectedBook}/> : loading ? <div className="reel-loading"><i/><p>Gathering ESV passages…</p></div> : feed.length ? <div className="reel-feed">{feed.map((verse, i) => <article className={`reel reel-${i % 4}`} key={verse.id}><div className="reel-ornament">{i % 2 ? "✦" : "❧"}</div><div className="reel-content"><span>{verse.topics[0] || "Scripture"}</span><blockquote>“{verse.text}”</blockquote><p>{verse.reference} <i>{verse.translation}</i></p></div><button className={pinned.has(verse.id) ? "pinned" : ""} onClick={() => pin(verse)}><Bookmark/>{pinned.has(verse.id) ? "Pinned" : "Pin to memorize"}</button>{verse.translation === "ESV" && <small>ESV® © 2001 Crossway. Used by permission. <a href="https://www.esv.org/" target="_blank" rel="noreferrer">ESV.org</a></small>}<div className="scroll-cue">Scroll for more <ArrowRight/></div></article>)}</div> : <div className="empty"><BookOpen/><h2>No passages available</h2><p>Add passages in this translation from the Verse Store.</p></div>}
+    {reelMode === "books" ? selectedBook ? <BookVerseReels book={selectedBook} pinned={pinned} onBack={() => setSelectedBook(null)} onPin={pin}/> : <BookReels onSelect={setSelectedBook}/> : loading ? <div className="reel-loading"><i/><p>Gathering ESV passages…</p></div> : feed.length ? <div className="reel-feed" onScroll={event => { const element = event.currentTarget; if (element.scrollHeight - element.scrollTop - element.clientHeight < element.clientHeight * 2) setVisibleFeed(current => [...current, ...freshReelBatch(feed, 12, current.at(-1)?.id)]); }}>{visibleFeed.map((verse, i) => <article className={`reel reel-${i % 4}`} key={`${verse.id}-${i}`}><div className="reel-ornament">{i % 2 ? "✦" : "❧"}</div><div className="reel-content"><span>{verse.topics[0] || "Scripture"}</span><blockquote>“{verse.text}”</blockquote><p>{verse.reference} <i>{verse.translation}</i></p></div><button className={pinned.has(verse.id) ? "pinned" : ""} onClick={() => pin(verse)}><Bookmark/>{pinned.has(verse.id) ? "Pinned" : "Pin to memorize"}</button>{verse.translation === "ESV" && <small>ESV® © 2001 Crossway. Used by permission. <a href="https://www.esv.org/" target="_blank" rel="noreferrer">ESV.org</a></small>}<div className="scroll-cue">Scroll for more <ArrowRight/></div></article>)}</div> : <div className="empty"><BookOpen/><h2>No passages available</h2><p>Add passages in this translation from the Verse Store.</p></div>}
   </div>;
 }
 
