@@ -1,0 +1,16 @@
+{
+  "name": "Selah Scripture Memory",
+  "short_name": "Selah",
+  "description": "Keep Scripture close through discovery, recall, and spaced repetition.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f6f3ec",
+  "theme_color": "#24493c",
+  "categories": ["education", "lifestyle"],
+  "icons": [
+    { "src": "/icons/selah.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/selah-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
