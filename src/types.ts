@@ -32,7 +32,7 @@ export type ReviewResult = {
   id: string;
   verseId: string;
   reviewedAt: string;
-  mode: "easy" | "hard";
+  mode: "easy" | "medium" | "hard" | "impossible";
   correct: number;
   total: number;
   percentage: number;
