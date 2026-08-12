@@ -2,16 +2,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BarChart3, BookHeart, BookOpen, Bookmark, Check, Download, Flame, History, Home, Layers3, Library, LogOut, Menu, Plus, Search, Settings, Sparkles, UserRound, WifiOff, X } from "lucide-react";
 import { packs, verses } from "./data";
 import { getLibrary, getPassages, getReviews, getSettings, getUsers, removeItem, saveItem, savePassage, saveReview, saveSettings, saveUser, scheduledItem } from "./db";
-import { bibleBooks, fetchKjvBook, fetchPassage } from "./bible";
+import { bibleBooks, fetchBibleBook, fetchKjvBook, fetchPassage, translations } from "./bible";
 import { esvStoredCount, parseEsvReference } from "./esvCompliance";
 import { hashPassword, SESSION_KEY } from "./auth";
 import { apiCollections, apiCommunityTags, apiCurrentUser, apiDelete, apiItems, apiPut, apiSignIn, apiSignOut, apiSignUp, serverEnabled } from "./api";
-import type { CommunityCollection, LibraryItem, ReviewRating, ReviewResult, User, UserSettings, Verse } from "./types";
+import type { CommunityCollection, LibraryItem, ReviewRating, ReviewResult, Translation, User, UserSettings, Verse } from "./types";
 
 type Page = "home" | "reels" | "store" | "library" | "history" | "settings" | "review";
 type ExerciseSummary = Pick<ReviewResult, "mode" | "correct" | "total" | "percentage" | "answers">;
 
 const starterIds = ["ps-46-10", "prov-3-5-6", "john-3-16"];
+const normalizeTranslation = (value: string | undefined): Translation => translations.some(item => item.id === value) ? value as Translation : "KJV";
 
 function reviewStreak(results: ReviewResult[]) {
   const days = new Set(results.map(result => { const date = new Date(result.reviewedAt); return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`; }));
@@ -48,7 +49,7 @@ function App() {
       }
       setUser(activeUser);
       if (!activeUser) { setReady(true); return; }
-      if (activeUser) setUserSettings(savedSettings.find(value => value.userId === activeUser.id) || { userId: activeUser.id, translation: "KJV", dailyGoal: 5, theme: "light", reminders: false });
+      if (activeUser) { const saved = savedSettings.find(value => value.userId === activeUser.id); setUserSettings(saved ? { ...saved, translation: normalizeTranslation(saved.translation) } : { userId: activeUser.id, translation: "KJV", dailyGoal: 5, theme: "light", reminders: false }); }
       setCatalog([...verses, ...customPassages.filter(custom => !verses.some(seed => seed.id === custom.id))]);
       setHistory(pastReviews.sort((a, b) => b.reviewedAt.localeCompare(a.reviewedAt)));
       if (!items.length) {
@@ -147,7 +148,7 @@ function App() {
     let nextLibrary = savedLibrary;
     if (!nextLibrary.length) { nextLibrary = starterIds.map((verseId, index) => ({ verseId, addedAt: new Date().toISOString(), stage: 1, reviews: index, nextReview: new Date().toISOString(), collection: index === 0 ? "Peace & Rest" : "My Verses" })); await Promise.all(nextLibrary.map(item => apiPut("library", item.verseId, item))); }
     const defaults: UserSettings = { userId: activeUser.id, translation: "KJV", dailyGoal: 5, theme: "light", reminders: false };
-    setLibrary(nextLibrary); setCatalog([...verses, ...savedPassages]); setHistory(savedReviews.sort((a,b) => b.reviewedAt.localeCompare(a.reviewedAt))); setUserSettings(savedPreferences[0] || defaults);
+    setLibrary(nextLibrary); setCatalog([...verses, ...savedPassages]); setHistory(savedReviews.sort((a,b) => b.reviewedAt.localeCompare(a.reviewedAt))); setUserSettings(savedPreferences[0] ? { ...savedPreferences[0], translation: normalizeTranslation(savedPreferences[0].translation) } : defaults);
     if (!savedPreferences[0]) await apiPut("settings", "preferences", defaults);
   }} />;
 
@@ -215,48 +216,84 @@ function AuthPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }
   return <main className="auth-page"><section className="auth-story"><div className="brand auth-brand"><span className="brand-mark">S</span><span>Selah<small>scripture memory</small></span></div><div><span className="overline">Keep the Word close</span><blockquote>“Thy word have I hid in mine heart, that I might not sin against thee.”</blockquote><p>Psalm 119:11</p></div></section><section className="auth-form"><div><p className="eyebrow">Welcome to Selah</p><h1>{mode === "signin" ? "Return to your practice." : "Begin your practice."}</h1><p>{mode === "signin" ? "Sign in to continue where you left off." : "Create your secure, synchronized account."}</p><form onSubmit={submit}>{mode === "signup" && <label>Your name<input value={name} onChange={e => setName(e.target.value)} autoComplete="name" required/></label>}<label>Email address<input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required/></label><label>Password<input type="password" minLength={8} value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === "signin" ? "current-password" : "new-password"} required/></label>{error && <p className="auth-error">{error}</p>}<button className="primary" disabled={busy}>{busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}<ArrowRight/></button></form><button className="auth-toggle" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }}>{mode === "signin" ? "New here? Create an account" : "Already have an account? Sign in"}</button><small className="local-note">Accounts and Scripture records are stored in the project’s PostgreSQL database and isolated by authenticated user ID.</small></div></section></main>;
 }
 
-const reelReferences = ["Psalm 23:1-3", "Matthew 6:33-34", "Isaiah 40:31", "Romans 12:2", "Lamentations 3:22-23", "John 15:5", "Hebrews 12:1-2", "James 1:2-4"];
-
-function freshReelBatch(source: Verse[], size = 12, previousId?: string) {
-  if (!source.length) return [];
-  const result: Verse[] = [];
-  while (result.length < size) {
-    const shuffled = [...source];
-    for (let index = shuffled.length - 1; index > 0; index--) {
-      const swap = Math.floor(Math.random() * (index + 1));
-      [shuffled[index], shuffled[swap]] = [shuffled[swap], shuffled[index]];
-    }
-    if ((result.at(-1)?.id || previousId) === shuffled[0]?.id && shuffled.length > 1) [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
-    result.push(...shuffled.slice(0, size - result.length));
+function shuffle<T>(values: T[]) {
+  const result = [...values];
+  for (let index = result.length - 1; index > 0; index--) {
+    const swap = Math.floor(Math.random() * (index + 1));
+    [result[index], result[swap]] = [result[swap], result[index]];
   }
   return result;
 }
 
-function ReelsPage({ catalog, library, translation: preferred, onBack, onPin, onImport }: { catalog: Verse[]; library: LibraryItem[]; translation: "KJV" | "ESV"; onBack: () => void; onPin: (v: Verse) => void; onImport: (v: Verse) => Promise<void> }) {
+function TranslationSelect({ value, onChange, compact = false }: { value: Translation; onChange: (value: Translation) => void; compact?: boolean }) {
+  return <label className={compact ? "translation-picker compact" : "translation-picker"}>Translation<select value={value} onChange={event => onChange(event.target.value as Translation)}>{translations.map(item => <option value={item.id} key={item.id}>{compact ? item.id : `${item.id} — ${item.name}`}</option>)}</select></label>;
+}
+
+function ReelsPage({ catalog, library, translation: preferred, onBack, onPin, onImport }: { catalog: Verse[]; library: LibraryItem[]; translation: Translation; onBack: () => void; onPin: (v: Verse) => void; onImport: (v: Verse) => Promise<void> }) {
   const [reelMode, setReelMode] = useState<"scripture" | "books">("scripture");
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
-  const [translation, setTranslation] = useState<"KJV" | "ESV">(preferred);
-  const [remote, setRemote] = useState<Verse[]>([]); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
+  const [translation, setTranslation] = useState<Translation>(preferred);
   const [visibleFeed, setVisibleFeed] = useState<Verse[]>([]);
+  const [loading, setLoading] = useState(false); const [error, setError] = useState("");
+  const seenReferences = useRef(new Set<string>()); const bookPools = useRef(new Map<string, Verse[]>());
+  const bookQueue = useRef<string[]>([]); const loadingMore = useRef(false);
+  const feedRef = useRef<HTMLDivElement>(null); const activeReel = useRef(0); const preservedReference = useRef<string | null>(null);
+  const feedGeneration = useRef(0);
   const pinned = new Set(library.map(item => item.verseId));
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = previousOverflow; };
   }, []);
-  useEffect(() => {
-    if (reelMode !== "scripture" || translation !== "ESV" || remote.length) return;
-    let cancelled = false; setLoading(true); setError("");
-    (async () => { const loaded: Verse[] = []; for (const reference of reelReferences.slice(0, 5)) { try { loaded.push(await fetchPassage(reference, "ESV")); } catch (err) { if (!loaded.length) setError(err instanceof Error ? err.message : "ESV feed unavailable"); break; } } if (!cancelled) { setRemote(loaded); setLoading(false); } })();
-    return () => { cancelled = true; };
-  }, [reelMode, translation, remote.length]);
-  const feed = useMemo(() => translation === "KJV" ? catalog.filter(v => v.translation === "KJV") : [...catalog.filter(v => v.translation === "ESV"), ...remote.filter(v => !catalog.some(c => c.id === v.id))], [translation, catalog, remote]);
-  useEffect(() => { setVisibleFeed(reelMode === "scripture" ? freshReelBatch(feed) : []); }, [feed, reelMode]);
+  async function loadMore(reset = false) {
+    const generation = feedGeneration.current;
+    if (reset) loadingMore.current = false;
+    if (loadingMore.current || reelMode !== "scripture") return;
+    loadingMore.current = true; if (reset) setLoading(true); setError("");
+    try {
+      if (reset) { seenReferences.current.clear(); bookPools.current.clear(); bookQueue.current = shuffle(bibleBooks.map(([name]) => name)); }
+      const next: Verse[] = [];
+      if (reset && preservedReference.current) {
+        const reference = preservedReference.current; preservedReference.current = null;
+        next.push(await fetchPassage(reference, translation)); seenReferences.current.add(reference);
+        if (generation === feedGeneration.current) {
+          setVisibleFeed([...next]);
+          requestAnimationFrame(() => { if (feedRef.current) feedRef.current.scrollTop = 0; });
+        }
+      }
+      while (next.length < 8) {
+        if (!bookQueue.current.length) bookQueue.current = shuffle([...bookPools.current.keys()].filter(book => bookPools.current.get(book)?.length));
+        if (!bookQueue.current.length && bookPools.current.size === bibleBooks.length) { bookPools.current.clear(); seenReferences.current.clear(); }
+        if (!bookQueue.current.length) bookQueue.current = shuffle(bibleBooks.map(([name]) => name));
+        const book = bookQueue.current.shift()!;
+        let pool = bookPools.current.get(book);
+        if (!pool) { pool = shuffle(translation === "ESV" ? await fetchKjvBook(book) : await fetchBibleBook(book, translation)); bookPools.current.set(book, pool); }
+        for (let count = 0; count < 2 && next.length < 8 && pool.length; count++) {
+          const base = pool.shift()!;
+          if (seenReferences.current.has(base.reference)) { count--; continue; }
+          seenReferences.current.add(base.reference);
+          next.push(translation === "ESV" ? await fetchPassage(base.reference, "ESV") : base);
+        }
+        if (pool.length) bookQueue.current.push(book);
+      }
+      if (generation !== feedGeneration.current) return;
+      setVisibleFeed(current => reset ? next : [...current, ...next]);
+      if (reset) requestAnimationFrame(() => { if (feedRef.current) feedRef.current.scrollTop = 0; });
+    } catch (err) { if (generation === feedGeneration.current) setError(err instanceof Error ? err.message : "More Scripture could not be loaded."); }
+    finally { if (generation === feedGeneration.current) { loadingMore.current = false; setLoading(false); } }
+  }
+  useEffect(() => { if (reelMode === "scripture") void loadMore(true); else setVisibleFeed([]); }, [reelMode, translation]);
+  function changeTranslation(value: Translation) {
+    if (value === translation) return;
+    if (reelMode === "scripture") preservedReference.current = visibleFeed[activeReel.current]?.reference || null;
+    feedGeneration.current++;
+    setTranslation(value); setError("");
+  }
   async function pin(verse: Verse) { try { if (catalog.some(v => v.id === verse.id)) await onPin(verse); else await onImport(verse); } catch (err) { setError(err instanceof Error ? err.message : "Could not pin passage"); } }
   return <div className="reels-page">
-    <div className="reels-toolbar"><button className="exit-reels" onClick={onBack} aria-label="Back to Selah"><ArrowLeft/><span>Back</span></button><div className="reels-title"><span className="overline">Scripture reels</span><h1>{reelMode === "scripture" ? "Pause. Read. Keep." : selectedBook ? `Reading ${selectedBook}` : "The story, book by book."}</h1></div><div className="reels-controls"><div className="reel-mode"><button className={reelMode === "scripture" ? "active" : ""} onClick={() => { setReelMode("scripture"); setSelectedBook(null); }}>Scripture</button><button className={reelMode === "books" ? "active" : ""} onClick={() => setReelMode("books")}>Books</button></div>{reelMode === "scripture" && <label>Translation<select value={translation} onChange={e => { setTranslation(e.target.value as "KJV" | "ESV"); setError(""); }}><option>KJV</option><option>ESV</option><option disabled>More translations coming soon</option></select></label>}</div></div>
+    <div className="reels-toolbar"><button className="exit-reels" onClick={onBack} aria-label="Back to Selah"><ArrowLeft/><span>Back</span></button><div className="reels-title"><span className="overline">Scripture reels</span><h1>{reelMode === "scripture" ? "Pause. Read. Keep." : selectedBook ? `Reading ${selectedBook}` : "The story, book by book."}</h1></div><div className="reels-controls"><div className="reel-mode"><button className={reelMode === "scripture" ? "active" : ""} onClick={() => { setReelMode("scripture"); setSelectedBook(null); }}>Scripture</button><button className={reelMode === "books" ? "active" : ""} onClick={() => setReelMode("books")}>Books</button></div><TranslationSelect compact value={translation} onChange={changeTranslation}/></div></div>
     {error && reelMode === "scripture" && <div className="reel-message">{error}</div>}
-    {reelMode === "books" ? selectedBook ? <BookVerseReels book={selectedBook} pinned={pinned} onBack={() => setSelectedBook(null)} onPin={pin}/> : <BookReels onSelect={setSelectedBook}/> : loading ? <div className="reel-loading"><i/><p>Gathering ESV passages…</p></div> : feed.length ? <div className="reel-feed" onScroll={event => { const element = event.currentTarget; if (element.scrollHeight - element.scrollTop - element.clientHeight < element.clientHeight * 2) setVisibleFeed(current => [...current, ...freshReelBatch(feed, 12, current.at(-1)?.id)]); }}>{visibleFeed.map((verse, i) => <article className={`reel reel-${i % 4}`} key={`${verse.id}-${i}`}><div className="reel-ornament">{i % 2 ? "✦" : "❧"}</div><div className="reel-content"><span>{verse.topics[0] || "Scripture"}</span><blockquote>“{verse.text}”</blockquote><p>{verse.reference} <i>{verse.translation}</i></p></div><button className={pinned.has(verse.id) ? "pinned" : ""} onClick={() => pin(verse)}><Bookmark/>{pinned.has(verse.id) ? "Pinned" : "Pin to memorize"}</button>{verse.translation === "ESV" && <small>ESV® © 2001 Crossway. Used by permission. <a href="https://www.esv.org/" target="_blank" rel="noreferrer">ESV.org</a></small>}<div className="scroll-cue">Scroll for more <ArrowRight/></div></article>)}</div> : <div className="empty"><BookOpen/><h2>No passages available</h2><p>Add passages in this translation from the Verse Store.</p></div>}
+    {reelMode === "books" ? selectedBook ? <BookVerseReels book={selectedBook} translation={translation} pinned={pinned} onBack={() => setSelectedBook(null)} onPin={pin}/> : <BookReels onSelect={setSelectedBook}/> : loading && !visibleFeed.length ? <div className="reel-loading"><i/><p>Gathering new {translation} passages…</p></div> : visibleFeed.length ? <div ref={feedRef} className="reel-feed" onScroll={event => { const element = event.currentTarget; activeReel.current = Math.max(0, Math.round(element.scrollTop / element.clientHeight)); if (element.scrollHeight - element.scrollTop - element.clientHeight < element.clientHeight * 4) void loadMore(); }}>{visibleFeed.map((verse, i) => <article className={`reel reel-${i % 4}`} key={`${verse.id}-${i}`}><div className="reel-ornament">{i % 2 ? "✦" : "❧"}</div><div className="reel-content"><span>{verse.topics[0] || "Scripture"}</span><blockquote>“{verse.text}”</blockquote><p>{verse.reference} <i>{verse.translation}</i></p></div><button className={pinned.has(verse.id) ? "pinned" : ""} onClick={() => pin(verse)}><Bookmark/>{pinned.has(verse.id) ? "Pinned" : "Pin to memorize"}</button>{verse.translation === "ESV" && <small>ESV® © 2001 Crossway. Used by permission. <a href="https://www.esv.org/" target="_blank" rel="noreferrer">ESV.org</a></small>}<div className="scroll-cue">Scroll for more <ArrowRight/></div></article>)}</div> : <div className="empty"><BookOpen/><h2>No passages available</h2><p>{error || "Try another translation."}</p></div>}
   </div>;
 }
 
@@ -268,20 +305,29 @@ function BookReels({ onSelect }: { onSelect: (book: string) => void }) {
   return <div className="reel-feed book-feed">{bibleBooks.map(([book, chapters], i) => <article className={`reel book-reel reel-${i % 4}`} key={book}><div className="book-watermark">{String(i + 1).padStart(2, "0")}</div><div className="reel-content"><span>{i < 39 ? "Old Testament" : "New Testament"} · {bookSection(i)}</span><h2>{book}</h2><p>{chapters} {chapters === 1 ? "chapter" : "chapters"}</p><button className="open-book" onClick={() => onSelect(book)}><BookOpen/> Read verses in order</button><div className="book-position"><i style={{ width: `${((i + 1) / bibleBooks.length) * 100}%` }}/></div><small>Book {i + 1} of {bibleBooks.length}</small></div><div className="book-neighbors"><span>{i ? `← ${bibleBooks[i - 1][0]}` : "Beginning"}</span><span>{i < bibleBooks.length - 1 ? `${bibleBooks[i + 1][0]} →` : "The end"}</span></div><div className="scroll-cue">Next book <ArrowRight/></div></article>)}</div>;
 }
 
-function BookVerseReels({ book, pinned, onBack, onPin }: { book: string; pinned: Set<string>; onBack: () => void; onPin: (verse: Verse) => Promise<void> }) {
+function BookVerseReels({ book, translation, pinned, onBack, onPin }: { book: string; translation: Translation; pinned: Set<string>; onBack: () => void; onPin: (verse: Verse) => Promise<void> }) {
   const [bookVerses, setBookVerses] = useState<Verse[]>([]); const [error, setError] = useState("");
   const [active, setActive] = useState(0); const feedRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { let live = true; fetchKjvBook(book).then(values => { if (live) setBookVerses(values); }).catch(err => { if (live) setError(err instanceof Error ? err.message : "Book unavailable"); }); return () => { live = false; }; }, [book]);
+  const esvSource = useRef<Verse[]>([]); const esvLoading = useRef(false);
+  const bookAnchor = useRef<string | null>(null);
+  async function loadMoreEsv() {
+    if (translation !== "ESV" || esvLoading.current || !esvSource.current.length) return;
+    esvLoading.current = true;
+    try { const next: Verse[] = []; for (const verse of esvSource.current.splice(0, 8)) next.push(await fetchPassage(verse.reference, "ESV")); setBookVerses(current => [...current, ...next]); }
+    catch (err) { setError(err instanceof Error ? err.message : "More ESV verses could not be loaded"); }
+    finally { esvLoading.current = false; }
+  }
+  useEffect(() => { let live = true; const anchor = bookAnchor.current || bookVerses[active]?.reference || null; bookAnchor.current = anchor; setBookVerses([]); setError(""); setActive(0); if (translation === "ESV") fetchKjvBook(book).then(values => { if (live) { const anchorIndex = anchor ? values.findIndex(verse => verse.reference === anchor) : 0; esvSource.current = values.slice(Math.max(0, anchorIndex)); void loadMoreEsv(); } }).catch(err => { if (live) setError(err instanceof Error ? err.message : "Book unavailable"); }); else fetchBibleBook(book, translation).then(values => { if (live) { setBookVerses(values); const anchorIndex = anchor ? values.findIndex(verse => verse.reference === anchor) : 0; requestAnimationFrame(() => feedRef.current?.querySelectorAll<HTMLElement>(".book-verse")[Math.max(0, anchorIndex)]?.scrollIntoView({ block: "start" })); } }).catch(err => { if (live) setError(err instanceof Error ? err.message : "Book unavailable"); }); return () => { live = false; esvSource.current = []; }; }, [book, translation]);
   function move(direction: -1 | 1) { const next = Math.max(0, Math.min(bookVerses.length - 1, active + direction)); feedRef.current?.querySelectorAll<HTMLElement>(".book-verse")[next]?.scrollIntoView({ behavior: "smooth", block: "start" }); }
   useEffect(() => { const key = (event: KeyboardEvent) => { if (event.key === "ArrowDown" || event.key === "PageDown") { event.preventDefault(); move(1); } if (event.key === "ArrowUp" || event.key === "PageUp") { event.preventDefault(); move(-1); } }; window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key); });
   if (error) return <div className="reel-loading"><BookOpen/><p>{error}</p><button onClick={onBack}>Back to books</button></div>;
   if (!bookVerses.length) return <div className="reel-loading"><i/><p>Opening {book}…</p></div>;
-  return <div className="verse-reels-shell"><div ref={feedRef} className="reel-feed verse-book-feed" tabIndex={0} onScroll={event => { const element = event.currentTarget; setActive(Math.max(0, Math.min(bookVerses.length - 1, Math.round(element.scrollTop / element.clientHeight)))); }}><button className="back-to-books" onClick={onBack}><ArrowLeft/> All books</button>{bookVerses.map((verse, i) => <article className={`reel book-verse reel-${Math.floor((verse.chapter - 1) / 2) % 4}`} key={verse.id}><div className="chapter-watermark">{verse.chapter}</div><div className="reel-content"><span>{book} · Chapter {verse.chapter}</span><blockquote>“{verse.text}”</blockquote><p>{verse.reference} <i>KJV</i></p></div><button className={pinned.has(verse.id) ? "pinned" : ""} onClick={() => onPin(verse)}><Bookmark/>{pinned.has(verse.id) ? "Pinned" : "Pin to memorize"}</button><div className="verse-sequence">Verse {i + 1} of {bookVerses.length}</div>{i === 0 && <div className="swipe-prompt"><ArrowUp/> Swipe or scroll <ArrowDown/></div>}</article>)}</div><div className="reel-nav"><button onClick={() => move(-1)} disabled={active === 0} aria-label="Previous verse"><ArrowUp/></button><span>{active + 1}<i/> {bookVerses.length}</span><button onClick={() => move(1)} disabled={active === bookVerses.length - 1} aria-label="Next verse"><ArrowDown/></button></div></div>;
+  return <div className="verse-reels-shell"><div ref={feedRef} className="reel-feed verse-book-feed" tabIndex={0} onScroll={event => { const element = event.currentTarget; const nextActive = Math.max(0, Math.min(bookVerses.length - 1, Math.round(element.scrollTop / element.clientHeight))); setActive(nextActive); bookAnchor.current = bookVerses[nextActive]?.reference || bookAnchor.current; if (nextActive >= bookVerses.length - 3) void loadMoreEsv(); }}><button className="back-to-books" onClick={onBack}><ArrowLeft/> All books</button>{bookVerses.map((verse, i) => <article className={`reel book-verse reel-${Math.floor((verse.chapter - 1) / 2) % 4}`} key={verse.id}><div className="chapter-watermark">{verse.chapter}</div><div className="reel-content"><span>{book} · Chapter {verse.chapter}</span><blockquote>“{verse.text}”</blockquote><p>{verse.reference} <i>{translation}</i></p></div><button className={pinned.has(verse.id) ? "pinned" : ""} onClick={() => onPin(verse)}><Bookmark/>{pinned.has(verse.id) ? "Pinned" : "Pin to memorize"}</button>{translation === "ESV" && <small>ESV® © 2001 Crossway. Used by permission.</small>}<div className="verse-sequence">Verse {i + 1}{translation === "ESV" && esvSource.current.length ? "+" : ` of ${bookVerses.length}`}</div>{i === 0 && <div className="swipe-prompt"><ArrowUp/> Swipe or scroll <ArrowDown/></div>}</article>)}</div><div className="reel-nav"><button onClick={() => move(-1)} disabled={active === 0} aria-label="Previous verse"><ArrowUp/></button><span>{active + 1}<i/> {bookVerses.length}{translation === "ESV" && esvSource.current.length ? "+" : ""}</span><button onClick={() => move(1)} disabled={active === bookVerses.length - 1 && !esvSource.current.length} aria-label="Next verse"><ArrowDown/></button></div></div>;
 }
 
 function SettingsPage({ user, settings, onSave, onSignOut }: { user: User; settings: UserSettings; onSave: (value: UserSettings) => void; onSignOut: () => void }) {
   const [draft, setDraft] = useState(settings);
-  return <div className="page settings-page"><section className="page-title"><p className="eyebrow">Your Selah</p><h1>Settings</h1><p>Shape a practice that fits your life.</p></section><div className="settings-layout"><aside><div className="settings-avatar">{user.name.split(" ").map(p => p[0]).join("").slice(0,2)}</div><h2>{user.name}</h2><p>{user.email}</p><span><UserRound/> PostgreSQL account</span></aside><section className="settings-panel"><div><span className="overline">Scripture</span><h2>Reading preferences</h2><label>Preferred translation<select value={draft.translation} onChange={e => setDraft({ ...draft, translation: e.target.value as "KJV" | "ESV" })}><option value="KJV">KJV — King James Version</option><option value="ESV">ESV — English Standard Version</option><option disabled>Additional translations coming soon</option></select><small>This preference opens Reels and the Bible browser in your chosen translation.</small></label></div><div><span className="overline">Practice</span><h2>Daily rhythm</h2><label>Daily verse goal<input type="number" min="1" max="50" value={draft.dailyGoal} onChange={e => setDraft({ ...draft, dailyGoal: Number(e.target.value) })}/></label><label className="toggle-line"><span>Daily reminders<small>Receive a gentle prompt to practice.</small></span><input type="checkbox" checked={draft.reminders} onChange={e => setDraft({ ...draft, reminders: e.target.checked })}/></label></div><div><span className="overline">Mobile app</span><h2>Install Selah</h2><p className="install-copy">Add Selah to your home screen for a full-screen, app-like experience.</p><InstallAppButton/></div><button className="primary" onClick={() => onSave(draft)}>Save preferences <Check/></button></section></div><button className="signout" onClick={onSignOut}><LogOut/> Sign out on this device</button></div>;
+  return <div className="page settings-page"><section className="page-title"><p className="eyebrow">Your Selah</p><h1>Settings</h1><p>Shape a practice that fits your life.</p></section><div className="settings-layout"><aside><div className="settings-avatar">{user.name.split(" ").map(p => p[0]).join("").slice(0,2)}</div><h2>{user.name}</h2><p>{user.email}</p><span><UserRound/> PostgreSQL account</span></aside><section className="settings-panel"><div><span className="overline">Scripture</span><h2>Reading preferences</h2><TranslationSelect value={draft.translation} onChange={translation => setDraft({ ...draft, translation })}/><small>This preference is the default everywhere Scripture is shown. You can still switch versions while reading.</small></div><div><span className="overline">Practice</span><h2>Daily rhythm</h2><label>Daily verse goal<input type="number" min="1" max="50" value={draft.dailyGoal} onChange={e => setDraft({ ...draft, dailyGoal: Number(e.target.value) })}/></label><label className="toggle-line"><span>Daily reminders<small>Receive a gentle prompt to practice.</small></span><input type="checkbox" checked={draft.reminders} onChange={e => setDraft({ ...draft, reminders: e.target.checked })}/></label></div><div><span className="overline">Mobile app</span><h2>Install Selah</h2><p className="install-copy">Add Selah to your home screen for a full-screen, app-like experience.</p><InstallAppButton/></div><button className="primary" onClick={() => onSave(draft)}>Save preferences <Check/></button></section></div><button className="signout" onClick={onSignOut}><LogOut/> Sign out on this device</button></div>;
 }
 
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
@@ -304,7 +350,7 @@ function HomePage({ due, streak, library, verseFor, onReview, onStore }: { due: 
   </div>;
 }
 
-function StorePage({ filtered, topics, topic, query, library, preferredTranslation, onQuery, onTopic, onToggle, onCollection, onImport }: { filtered: Verse[]; topics: string[]; topic: string; query: string; library: LibraryItem[]; preferredTranslation: "KJV" | "ESV"; onQuery: (q: string) => void; onTopic: (t: string) => void; onToggle: (v: Verse) => void; onCollection: (name: string, verseIds?: string[]) => void; onImport: (v: Verse) => void }) {
+function StorePage({ filtered, topics, topic, query, library, preferredTranslation, onQuery, onTopic, onToggle, onCollection, onImport }: { filtered: Verse[]; topics: string[]; topic: string; query: string; library: LibraryItem[]; preferredTranslation: Translation; onQuery: (q: string) => void; onTopic: (t: string) => void; onToggle: (v: Verse) => void; onCollection: (name: string, verseIds?: string[]) => void; onImport: (v: Verse) => void }) {
   const saved = new Set(library.map(i => i.verseId));
   const [community, setCommunity] = useState<CommunityCollection[]>([]);
   const [communityTags, setCommunityTags] = useState<Record<string, { tag: string; uses: number }[]>>({});
@@ -323,11 +369,11 @@ function StorePage({ filtered, topics, topic, query, library, preferredTranslati
   </div>;
 }
 
-function BibleBrowser({ preferredTranslation, onImport }: { preferredTranslation: "KJV" | "ESV"; onImport: (verse: Verse) => void }) {
+function BibleBrowser({ preferredTranslation, onImport }: { preferredTranslation: Translation; onImport: (verse: Verse) => void }) {
   const [book, setBook] = useState("John");
   const [chapter, setChapter] = useState(3);
   const [verseRange, setVerseRange] = useState("16");
-  const [translation, setTranslation] = useState<"KJV" | "ESV">(preferredTranslation);
+  const [translation, setTranslation] = useState<Translation>(preferredTranslation);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const maxChapters = bibleBooks.find(([name]) => name === book)?.[1] || 1;
@@ -337,7 +383,7 @@ function BibleBrowser({ preferredTranslation, onImport }: { preferredTranslation
     catch (err) { setError(err instanceof Error ? err.message : "Passage could not be loaded"); }
     finally { setLoading(false); }
   }
-  return <section className="bible-browser"><div><span className="overline">The whole Bible</span><h2>Add any passage</h2><p>Choose a book, chapter, verse or range, and translation.</p></div><div className="passage-picker"><label>Book<select value={book} onChange={e => { setBook(e.target.value); setChapter(1); }}>{bibleBooks.map(([name]) => <option key={name}>{name}</option>)}</select></label><label>Chapter<select value={chapter} onChange={e => setChapter(Number(e.target.value))}>{Array.from({ length: maxChapters }, (_, i) => <option key={i + 1}>{i + 1}</option>)}</select></label><label>Verse(s)<input value={verseRange} onChange={e => setVerseRange(e.target.value.replace(/[^0-9-]/g, ""))} placeholder="1 or 1-5"/></label><label>Translation<select value={translation} onChange={e => setTranslation(e.target.value as "KJV" | "ESV")}><option>KJV</option><option>ESV</option></select></label><button className="primary" onClick={add} disabled={loading || !verseRange}>{loading ? "Loading…" : <><Plus/> Add passage</>}</button></div>{error && <p className="browser-error">{error}</p>}<small>{translation === "ESV" ? <>ESV requires a free Crossway API key. <a href="https://api.esv.org/" target="_blank" rel="noreferrer">Get one here.</a></> : "KJV passages are loaded from the public GetBible catalog."}</small></section>;
+  return <section className="bible-browser"><div><span className="overline">The whole Bible</span><h2>Add any passage</h2><p>Choose a book, chapter, verse or range, and translation.</p></div><div className="passage-picker"><label>Book<select value={book} onChange={e => { setBook(e.target.value); setChapter(1); }}>{bibleBooks.map(([name]) => <option key={name}>{name}</option>)}</select></label><label>Chapter<select value={chapter} onChange={e => setChapter(Number(e.target.value))}>{Array.from({ length: maxChapters }, (_, i) => <option key={i + 1}>{i + 1}</option>)}</select></label><label>Verse(s)<input value={verseRange} onChange={e => setVerseRange(e.target.value.replace(/[^0-9-]/g, ""))} placeholder="1 or 1-5"/></label><TranslationSelect value={translation} onChange={setTranslation}/><button className="primary" onClick={add} disabled={loading || !verseRange}>{loading ? "Loading…" : <><Plus/> Add passage</>}</button></div>{error && <p className="browser-error">{error}</p>}<small>{translation === "ESV" ? <>ESV requires a free Crossway API key. <a href="https://api.esv.org/" target="_blank" rel="noreferrer">Get one here.</a></> : `${translations.find(item => item.id === translation)?.name} is loaded from the GetBible catalog (${translations.find(item => item.id === translation)?.notice}).`}</small></section>;
 }
 
 function LibraryPage({ library, verseFor, onRemove, onUpdate, onReview, onStore }: { library: LibraryItem[]; verseFor: (id: string) => Verse; onRemove: (v: Verse) => void; onUpdate: (item: LibraryItem) => void; onReview: () => void; onStore: () => void }) {

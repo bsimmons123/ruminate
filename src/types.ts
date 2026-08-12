@@ -25,7 +25,8 @@ export type CommunityCollection = { id: string; title: string; description: stri
 export type ReviewRating = "again" | "hard" | "good" | "easy";
 
 export type User = { id: string; name: string; email: string; passwordHash?: string; createdAt: string };
-export type UserSettings = { userId: string; translation: "KJV" | "ESV"; dailyGoal: number; theme: "light" | "system"; reminders: boolean };
+export type Translation = "KJV" | "ESV" | "ASV" | "WEB" | "YLT";
+export type UserSettings = { userId: string; translation: Translation; dailyGoal: number; theme: "light" | "system"; reminders: boolean };
 
 export type ReviewResult = {
   id: string;
