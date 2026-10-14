@@ -98,7 +98,7 @@ docker compose up --build
 
 Open `http://localhost:3001`. Docker Compose starts PostgreSQL 17, waits for a healthy database, and then starts the application API and compiled web client. The application applies its idempotent schema on every startup, including when an existing database volume is empty or behind the current schema. Database data is retained in the `selah_postgres` named volume.
 
-On mobile, open Settings → Install Ruminate. Android browsers can show the native install prompt; on iPhone, use Safari’s Share → Add to Home Screen. The service worker caches only the application shell and static assets—authenticated API and ESV responses are explicitly excluded.
+On mobile, open Settings → Install Ruminate. Android browsers can show the native install prompt; on iPhone, use Safari’s Share → Add to Home Screen. The service worker caches the application shell, static assets, and bundled Bible text—authenticated API and ESV responses are explicitly excluded. Public-domain Bible files are cached separately for offline reading.
 
 Keep `COOKIE_SECURE=false` for local HTTP. Set it to `true` when deploying behind HTTPS. Always replace the example database password and JWT secret before exposing the application publicly.
 
@@ -169,3 +169,25 @@ Mark a verse as memorized in My Library, or reach stage 6 with at least 90% accu
 Ruminate retains the existing `com.selah.scripturememory` installation ID, signing key, saved-data keys, database names, and Compose deployment identity so existing installs and deployments keep their accounts and progress. The API remains at `https://selah.simmonsweb.com` until a new domain is configured. New container images are published under `ghcr.io/bsimmons123/ruminate`.
 
 Container publication builds AMD64 on `ubuntu-24.04` and ARM64 on `ubuntu-24.04-arm`. Each image must load Node and the server dependencies on its native runner before the combined `latest` and commit tags are published. This avoids running Node under QEMU during dependency installation.
+
+## Bundled Scripture and offline reading
+
+WEB Classic, KJV, ASV, and YLT are included as 264 book JSON files under `public/bible/`. Native builds package all these files for offline reading; the browser service worker downloads them once for offline use. New reading preferences default to WEB, while existing preferences, saved verses, and progress retain their original translations. Use **Read Bible offline** from the opening or sign-in screen when the account server is unavailable. After one successful online sign-in, the account profile, library, saved passages, settings, and review history are stored on the device. Users remain signed in without Wi-Fi and can add bundled passages, practice, take Memory Bank quizzes, and update their memorized verses. Changes are saved in IndexedDB before the interface confirms them and survive closing or reloading the app. A status badge shows updates waiting to sync.
+
+When internet access returns, Ruminate checks the session and uploads the queued changes automatically, including review history and progress. The queue is scoped to the account that created it; switching accounts never uploads another account's changes. A revoked or expired session requires signing in again, while pending practice remains on the device for that original account. Sign-out requires a connection so the backend can invalidate the session. ESV reading still requires internet; previously saved passages remain available for practice.
+
+Native builds include the Scripture files at installation. For the web app, open it online first and allow its service worker to finish caching before leaving coverage. Clearing site/app storage or uninstalling removes unsynced local practice. Run `npm run build && npm run test:offline` to verify offline reopening, quizzes, translation switching, retry-safe sync, and account isolation in Chromium (`npx playwright install chromium` first).
+
+The backend serves the same files through `/api/bible/:translation/book/:number` and `/api/bible/:translation/passage?q=John%203%3A16-18`. Per-translation source metadata is at `/api/bible/:translation/manifest`. None of these reading endpoints calls an upstream Bible provider. ESV continues to use its licensed online API and is excluded from the offline bundle.
+
+WEB and KJV were imported from eBible.org verse-per-line archives. ASV and YLT use the existing GetBible public-domain distributions. Each edition has a source URL, source SHA-256, per-book checksums, and its distribution notice. Source text and numbering are preserved, including intentionally empty entries in the source; empty entries are skipped in the scrolling reader. The bundles include the 66 books already supported by Ruminate.
+
+To update the source snapshots deliberately, download the sources listed in each `manifest.json`, then run:
+
+```bash
+python3 scripts/import-web-bible.py /path/to/eng-web_vpl.zip
+python3 scripts/import-public-bibles.py /path/to/eng-kjv_vpl.zip /path/to/asv.json /path/to/ylt.json
+npm run test:bible
+```
+
+Normal builds use committed snapshots and never download Scripture. When changing a bundled text snapshot, increment the Scripture cache version in `public/sw.js`.

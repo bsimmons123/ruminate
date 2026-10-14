@@ -8,13 +8,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
 import { startReminderScheduler } from "./reminders.js";
+import { bundledTranslations, getBibleBook, getBibleManifest, getBiblePassage } from "./bundled-bible.js";
 
 const app = express();
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL || "postgresql://selah:selah@127.0.0.1:5432/selah" });
 const jwtSecret = process.env.JWT_SECRET || "development-only-change-me";
 const port = Number(process.env.PORT || 3001);
 const validKinds = new Set(["library", "passage", "review", "settings"]);
-const bibleCache = new Map();
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && ["https://localhost", "capacitor://localhost", "http://localhost"].includes(origin)) {
@@ -80,7 +80,24 @@ app.put("/api/devices", requireUser, async (req, res) => {
 });
 app.delete("/api/devices/:token", requireUser, async (req, res) => { await pool.query("delete from push_devices where token=$1 and user_id=$2", [req.params.token, req.userId]); res.json({ ok: true }); });
 
-app.get("/api/bible/:translation/book/:number", requireUser, async (req, res) => { try { const translation = String(req.params.translation).toLowerCase(); if (!new Set(["kjv", "asv", "web", "ylt"]).has(translation)) return res.status(400).json({ error: "That translation is not available for whole-book reading." }); const number = Number(req.params.number); if (!Number.isInteger(number) || number < 1 || number > 66) return res.status(400).json({ error: "Choose a Bible book from 1 to 66." }); const key = `${translation}:${number}`; const cached = bibleCache.get(key); if (cached && cached.expires > Date.now()) return res.json(cached.verses); const upstream = await fetch(`https://api.getbible.net/v2/${translation}/${number}.json`, { signal: AbortSignal.timeout(12000) }); if (!upstream.ok) return res.status(502).json({ error: `The ${translation.toUpperCase()} book could not be loaded.` }); const data = await upstream.json(); const found = []; const visit = value => { if (!value || typeof value !== "object") return; if (typeof value.text === "string" && Number.isFinite(Number(value.chapter)) && Number.isFinite(Number(value.verse))) found.push({ chapter: Number(value.chapter), verse: Number(value.verse), text: value.text.trim() }); else Object.values(value).forEach(visit); }; visit(data); const unique = Array.from(new Map(found.map(v => [`${v.chapter}:${v.verse}`, v])).values()).sort((a,b) => a.chapter - b.chapter || a.verse - b.verse); if (!unique.length) return res.status(502).json({ error: "No verses were returned for this book." }); if (bibleCache.size >= 24) bibleCache.delete(bibleCache.keys().next().value); bibleCache.set(key, { verses: unique, expires: Date.now() + 3600000 }); res.json(unique); } catch { res.status(502).json({ error: "The Bible provider is unavailable." }); } });
+app.get("/api/bible/:translation/manifest", async (req, res, next) => {
+  const translation = req.params.translation.toLowerCase();
+  if (!bundledTranslations.has(translation)) return res.status(404).json({ error: "That translation is not bundled." });
+  try { res.json(await getBibleManifest(translation)); } catch (error) { next(error); }
+});
+app.get("/api/bible/:translation/passage", requireUser, async (req, res, next) => {
+  const translation = req.params.translation.toLowerCase();
+  if (!bundledTranslations.has(translation)) return res.status(400).json({ error: "That translation is not bundled." });
+  try { res.json(await getBiblePassage(translation, String(req.query.q || ""))); }
+  catch (error) { if (error.code) return next(error); res.status(400).json({ error: error instanceof Error ? error.message : "Passage could not be opened." }); }
+});
+app.get("/api/bible/:translation/book/:number", requireUser, async (req, res, next) => {
+  const translation = req.params.translation.toLowerCase();
+  if (!bundledTranslations.has(translation)) return res.status(400).json({ error: "That translation is not available for whole-book reading." });
+  const number = Number(req.params.number);
+  if (!Number.isInteger(number) || number < 1 || number > 66) return res.status(400).json({ error: "Choose a Bible book from 1 to 66." });
+  try { res.json(await getBibleBook(translation, number)); } catch (error) { next(error); }
+});
 
 app.get("/api/esv", requireUser, async (req, res) => { try { if (!process.env.ESV_API_KEY) return res.status(503).json({ error: "ESV_API_KEY is not configured." }); const query = String(req.query.q || ""); if (!/^.+\s\d+:\d+(?:-\d+)?$/.test(query)) return res.status(400).json({ error: "Use a single-chapter reference such as John 3:16-18." }); const { rows } = await pool.query("select count(*) filter (where requested_at > now() - interval '1 minute')::int as minute, count(*) filter (where requested_at > now() - interval '1 hour')::int as hour, count(*) filter (where requested_at > now() - interval '1 day')::int as day from esv_requests"); if (rows[0].minute >= 60 || rows[0].hour >= 1000 || rows[0].day >= 5000) return res.status(429).json({ error: "ESV request limit reached. Please try again later." }); await pool.query("insert into esv_requests default values"); const upstream = await fetch(`https://api.esv.org/v3/passage/text/?q=${encodeURIComponent(query)}&include-headings=false&include-footnotes=false&include-verse-numbers=false&include-passage-references=false&include-short-copyright=false`, { headers: { Authorization: `Token ${process.env.ESV_API_KEY}` } }); const data = await upstream.json(); res.status(upstream.status).json(upstream.ok ? { reference: data.canonical, text: data.passages?.[0] || "" } : { error: data.detail || "ESV request failed" }); } catch (error) { console.error("ESV route failed:", error instanceof Error ? error.message : error); res.status(500).json({ error: "ESV passage could not be loaded." }); } });
 

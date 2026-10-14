@@ -1,0 +1,32 @@
+{
+  "translations": [
+    {
+      "translation": "WEB",
+      "edition": "World English Bible Classic \u2014 2020 stable text",
+      "source": "https://ebible.org/Scriptures/eng-web_vpl.zip",
+      "sourceSha256": "116f3c1a22e7e2ff316bfdae7c9b082782517d4fc1095bc5cc9a2b614308165c",
+      "verseCount": 31103
+    },
+    {
+      "translation": "KJV",
+      "edition": "King James Version \u2014 standardized 1769 text",
+      "source": "https://ebible.org/Scriptures/eng-kjv_vpl.zip",
+      "sourceSha256": "863b964d8d8fa45ebd33b41ef4ff62b50cb297100aa3ed289120784d453cdff0",
+      "verseCount": 31102
+    },
+    {
+      "translation": "ASV",
+      "edition": "American Standard Version (1901)",
+      "source": "https://api.getbible.net/v2/asv.json",
+      "sourceSha256": "77a54e266ce2fb0e796e72dcce1952e9625f40f2a98de325307bc70dd6fdf42e",
+      "verseCount": 31086
+    },
+    {
+      "translation": "YLT",
+      "edition": "Young's Literal Translation (1898)",
+      "source": "https://api.getbible.net/v2/ylt.json",
+      "sourceSha256": "708fca4720b477d920fcfeeb7b963fa36a228803cb29670a7c9c98c67de0fb52",
+      "verseCount": 31102
+    }
+  ]
+}

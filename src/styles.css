@@ -119,3 +119,6 @@ h1,h2,h3,blockquote { font-family:"Gilda Display",serif; font-weight:400; }
   .reel{height:100%;min-height:100%}
   .reel-content{max-height:calc(100% - 120px);overflow-y:auto;overscroll-behavior:contain}
 }
+.offline-reading{display:flex;align-items:center;gap:8px;margin:20px auto 0;border:1px solid var(--line);background:transparent;color:var(--forest);padding:11px 16px;cursor:pointer;font-size:13px}
+.auth-form .offline-reading{margin-left:0}
+.offline-reading-label{color:#e2c497;font-size:11px}

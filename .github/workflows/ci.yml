@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate bundled Bible text and lookup
+        run: npm run test:bible
+
       - name: Build web application
         run: npm run build
 
@@ -36,6 +39,12 @@ jobs:
         run: |
           node --check server/index.js
           node --check server/reminders.js
+
+      - name: Install browser for offline regression checks
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify offline account access and sync
+        run: npm run test:offline
 
       - name: Sync native projects
         run: npx cap sync

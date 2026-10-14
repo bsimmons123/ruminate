@@ -14,6 +14,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node server ./server
+COPY --chown=node:node public/bible ./public/bible
 COPY --chown=node:node scripts/send-test-push.mjs ./scripts/send-test-push.mjs
 USER node
 EXPOSE 3001

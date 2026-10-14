@@ -9,3 +9,7 @@ android/app/google-services.json
 .signing/
 *.p8
 *service-account*.json
+
+# Browser regression test output
+test-results/
+playwright-report/

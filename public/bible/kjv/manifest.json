@@ -1,0 +1,474 @@
+{
+  "translation": "KJV",
+  "edition": "King James Version — standardized 1769 text",
+  "license": "Public domain (see LICENSE.txt for distribution notice)",
+  "source": "https://ebible.org/Scriptures/eng-kjv_vpl.zip",
+  "sourceSha256": "863b964d8d8fa45ebd33b41ef4ff62b50cb297100aa3ed289120784d453cdff0",
+  "scope": "66 books of the Old and New Testaments",
+  "verseCount": 31102,
+  "emptyVerseCount": 0,
+  "books": [
+    {
+      "number": 1,
+      "name": "Genesis",
+      "chapters": 50,
+      "verses": 1533,
+      "sha256": "5d8b01679a2950eed3d2728aa8ad40cd4c5dd1d14504beba5b3c383c6140d45a"
+    },
+    {
+      "number": 2,
+      "name": "Exodus",
+      "chapters": 40,
+      "verses": 1213,
+      "sha256": "029fe37e3d9aad5375e303929d490d277d424ff82181276ca6ad13182cd95089"
+    },
+    {
+      "number": 3,
+      "name": "Leviticus",
+      "chapters": 27,
+      "verses": 859,
+      "sha256": "2ad61ad64582dc4ab57406f55d2d1d3415825fcd15ed261a08f85e001b938777"
+    },
+    {
+      "number": 4,
+      "name": "Numbers",
+      "chapters": 36,
+      "verses": 1288,
+      "sha256": "d280dc0b7906bfcbda23243202057be042c93a77a495a646573587c93d33f959"
+    },
+    {
+      "number": 5,
+      "name": "Deuteronomy",
+      "chapters": 34,
+      "verses": 959,
+      "sha256": "d943aa461ba2cfbc771c575a8e97bd25dff8179480cf88ebc2eedcdbfca31920"
+    },
+    {
+      "number": 6,
+      "name": "Joshua",
+      "chapters": 24,
+      "verses": 658,
+      "sha256": "4e8c8cb717c53d9e9e48ade382fc4870402e4ca28f8e0764ecc3b3ff29cce47b"
+    },
+    {
+      "number": 7,
+      "name": "Judges",
+      "chapters": 21,
+      "verses": 618,
+      "sha256": "5ded49e1aea7f1a2a2623764ed70b9a38f62c9f1aecb618933714dfec5461f21"
+    },
+    {
+      "number": 8,
+      "name": "Ruth",
+      "chapters": 4,
+      "verses": 85,
+      "sha256": "cc0a39ac5514cd028aaa2f9df34619ba16f51f6c34f2fabaf2d9e69a4934af01"
+    },
+    {
+      "number": 9,
+      "name": "1 Samuel",
+      "chapters": 31,
+      "verses": 810,
+      "sha256": "cca6fdaff499a12db886074fda35d7c0b730ed8c594f2c813c5a0033700dc3f4"
+    },
+    {
+      "number": 10,
+      "name": "2 Samuel",
+      "chapters": 24,
+      "verses": 695,
+      "sha256": "efad036a830dd9bd7c61c770a489348e032c80ec87ead8e70c59ca083e4c7b73"
+    },
+    {
+      "number": 11,
+      "name": "1 Kings",
+      "chapters": 22,
+      "verses": 816,
+      "sha256": "f6c6f298a6f3064b2141e345e88135ad771a99f4066db8dc4de405c4df5df229"
+    },
+    {
+      "number": 12,
+      "name": "2 Kings",
+      "chapters": 25,
+      "verses": 719,
+      "sha256": "ad62d1944f4bb82624cefd5b4495c200a8eb6100bb1d24b244e078438259ce44"
+    },
+    {
+      "number": 13,
+      "name": "1 Chronicles",
+      "chapters": 29,
+      "verses": 942,
+      "sha256": "3c9eeeaf50166062cc59c0b8ec9da9420fa55d825cc309aae3dce35a212af324"
+    },
+    {
+      "number": 14,
+      "name": "2 Chronicles",
+      "chapters": 36,
+      "verses": 822,
+      "sha256": "17ae8df1dc0533972237e618bdb84d5efc4fd6e9ad3273d4821fe3ef003a918a"
+    },
+    {
+      "number": 15,
+      "name": "Ezra",
+      "chapters": 10,
+      "verses": 280,
+      "sha256": "96a1d1b4daa5a835819b84bf59fa8a45324615f6dea12c264cc7ff0d2d2137ce"
+    },
+    {
+      "number": 16,
+      "name": "Nehemiah",
+      "chapters": 13,
+      "verses": 406,
+      "sha256": "ad52f1f1d092f7c848ea7b5d1bfd913cb993b9859dc9fe3eff3313411ecf4f4c"
+    },
+    {
+      "number": 17,
+      "name": "Esther",
+      "chapters": 10,
+      "verses": 167,
+      "sha256": "4e2b0a66e6518aa26281f4556c13a3ce45b59f741dd6247dcfb32d042c64c5ba"
+    },
+    {
+      "number": 18,
+      "name": "Job",
+      "chapters": 42,
+      "verses": 1070,
+      "sha256": "c94311a8968902c1bdeca4c6cdefc3b3b94521c937937d33f405821ab0905173"
+    },
+    {
+      "number": 19,
+      "name": "Psalms",
+      "chapters": 150,
+      "verses": 2461,
+      "sha256": "c779e89e93d091a9ffc03fc21429afd305bcef4181f8f721e265c6272c1aa31a"
+    },
+    {
+      "number": 20,
+      "name": "Proverbs",
+      "chapters": 31,
+      "verses": 915,
+      "sha256": "b41bc93fcaca7c9f27e3d195aa7e1f1fcd1385bf465b22f773e23e9cd86b2bdf"
+    },
+    {
+      "number": 21,
+      "name": "Ecclesiastes",
+      "chapters": 12,
+      "verses": 222,
+      "sha256": "19dbcc11d91a58a7b14d2496dc0daebfe89fbacfaac3f708477101bc28c8a310"
+    },
+    {
+      "number": 22,
+      "name": "Song of Solomon",
+      "chapters": 8,
+      "verses": 117,
+      "sha256": "c681bc85711470cda6d6ceb48c6fdfc520aa0757748a9a2ea06d89f481b6aa5a"
+    },
+    {
+      "number": 23,
+      "name": "Isaiah",
+      "chapters": 66,
+      "verses": 1292,
+      "sha256": "70f64efeda7c63413b9e9a63305df72a7fb87f440e93355936944c194bd6de32"
+    },
+    {
+      "number": 24,
+      "name": "Jeremiah",
+      "chapters": 52,
+      "verses": 1364,
+      "sha256": "b397dd2a6f6141beaad586c2438c60f6c1a0c7629370be54eb7d26157cdff23f"
+    },
+    {
+      "number": 25,
+      "name": "Lamentations",
+      "chapters": 5,
+      "verses": 154,
+      "sha256": "86b5eb318aca778aba0fe9acae1ca04b6ecd7f61bc9dcff4cac729d0098617be"
+    },
+    {
+      "number": 26,
+      "name": "Ezekiel",
+      "chapters": 48,
+      "verses": 1273,
+      "sha256": "d6d0c9fc82c03bac5e03daa5e66b450325acf3e0032315a2919e3ae035200caa"
+    },
+    {
+      "number": 27,
+      "name": "Daniel",
+      "chapters": 12,
+      "verses": 357,
+      "sha256": "f5c40ccbfb1e745e5c34e2af40ead45371a24c5ef057926d3c92fb7a0ace6919"
+    },
+    {
+      "number": 28,
+      "name": "Hosea",
+      "chapters": 14,
+      "verses": 197,
+      "sha256": "d3c3d29ca9b2992d641818820851fd2359637b37118bb5f9d61ffda4240c83bd"
+    },
+    {
+      "number": 29,
+      "name": "Joel",
+      "chapters": 3,
+      "verses": 73,
+      "sha256": "87d1a2754b02d832eab82f9a12241ee8969f1f4584232731b665b8296a7fb99d"
+    },
+    {
+      "number": 30,
+      "name": "Amos",
+      "chapters": 9,
+      "verses": 146,
+      "sha256": "34198975482854d19d10c469e89b8c1c2786dbab34f6381941846eafcdeac4df"
+    },
+    {
+      "number": 31,
+      "name": "Obadiah",
+      "chapters": 1,
+      "verses": 21,
+      "sha256": "aa85850fa52590dad6256e4687a0c167e581dd8f4e0f27ff1b2f5a4805f2df55"
+    },
+    {
+      "number": 32,
+      "name": "Jonah",
+      "chapters": 4,
+      "verses": 48,
+      "sha256": "6f0f78381625ddbd2d8793da1f8abb3ecfb34985e559196996ad693f1febb47b"
+    },
+    {
+      "number": 33,
+      "name": "Micah",
+      "chapters": 7,
+      "verses": 105,
+      "sha256": "67d6cc85bfc01680d1714ac7b562f27117c015ccdbb4fc841aadbf9ddf656b50"
+    },
+    {
+      "number": 34,
+      "name": "Nahum",
+      "chapters": 3,
+      "verses": 47,
+      "sha256": "edc9237bd82e6d191e2cf8b0f0782ee32c56f76f0952952b3873b07597875471"
+    },
+    {
+      "number": 35,
+      "name": "Habakkuk",
+      "chapters": 3,
+      "verses": 56,
+      "sha256": "97629d6ee9bfb8ae3bc0ff0496cb95f230c59c24f95c387b52895c649d1fc872"
+    },
+    {
+      "number": 36,
+      "name": "Zephaniah",
+      "chapters": 3,
+      "verses": 53,
+      "sha256": "6584209d95a0ee43e80a268fa8778c79add4bd8248e4e35448c30bc8c5d0bafc"
+    },
+    {
+      "number": 37,
+      "name": "Haggai",
+      "chapters": 2,
+      "verses": 38,
+      "sha256": "c57221b9c652f0eb84bf2cf0ea3d95c06f2144b4b0cf68699daee428a0190984"
+    },
+    {
+      "number": 38,
+      "name": "Zechariah",
+      "chapters": 14,
+      "verses": 211,
+      "sha256": "3374eae2aaa62e0b096054a3274cc3c5379998e2d550e7932084501cd2e8e530"
+    },
+    {
+      "number": 39,
+      "name": "Malachi",
+      "chapters": 4,
+      "verses": 55,
+      "sha256": "771b14786d209d3f4c895938c98e5a05ab4db90f145c3a3d7ba3fd0e6b21faf8"
+    },
+    {
+      "number": 40,
+      "name": "Matthew",
+      "chapters": 28,
+      "verses": 1071,
+      "sha256": "df2b3b6c0a92061fd3fdd267ae9a8052f881dd9d70495413152f2481c3aa4b32"
+    },
+    {
+      "number": 41,
+      "name": "Mark",
+      "chapters": 16,
+      "verses": 678,
+      "sha256": "6e152082696d11b288ab9532b0c4c9a5df0ff118e0928b60b450c77becc0307f"
+    },
+    {
+      "number": 42,
+      "name": "Luke",
+      "chapters": 24,
+      "verses": 1151,
+      "sha256": "77c0fe49e93896f48e5483c2eeff55eb0cae35f48b74ca6bc4e77401e6aa6790"
+    },
+    {
+      "number": 43,
+      "name": "John",
+      "chapters": 21,
+      "verses": 879,
+      "sha256": "0424e5f106d2fc5d26e20a13a9b02e1058174c09556b4e9ff778c5523889a19c"
+    },
+    {
+      "number": 44,
+      "name": "Acts",
+      "chapters": 28,
+      "verses": 1007,
+      "sha256": "06b202940ea35b3a29c7bd33a2286651fa100ba7b12feeeb520e3f9604c060d5"
+    },
+    {
+      "number": 45,
+      "name": "Romans",
+      "chapters": 16,
+      "verses": 433,
+      "sha256": "16049aae0d104419b3eae9d45b8b0bf18a08f2b52b0511476411f69b7b3a90fb"
+    },
+    {
+      "number": 46,
+      "name": "1 Corinthians",
+      "chapters": 16,
+      "verses": 437,
+      "sha256": "722379027afae957c9c80d18f46e4e43ddf71d8a3b272d21c79dfb0e9ef5b9f7"
+    },
+    {
+      "number": 47,
+      "name": "2 Corinthians",
+      "chapters": 13,
+      "verses": 257,
+      "sha256": "de4ed8d276456944d9146a208235e2b2533f79f9c91887bc1418d345bc9d3de5"
+    },
+    {
+      "number": 48,
+      "name": "Galatians",
+      "chapters": 6,
+      "verses": 149,
+      "sha256": "c756ddcac440ed234ea19d832dfd60bf41a13d6b403100ee5341ce997e9662a6"
+    },
+    {
+      "number": 49,
+      "name": "Ephesians",
+      "chapters": 6,
+      "verses": 155,
+      "sha256": "732a0049b7339dc5b2b5b7a8cbc5b14212731d22f42cbba07eff4227d1f43942"
+    },
+    {
+      "number": 50,
+      "name": "Philippians",
+      "chapters": 4,
+      "verses": 104,
+      "sha256": "949147a102218f19bf5615a5d56d76207adee9594640faf60a55805ad1c8b153"
+    },
+    {
+      "number": 51,
+      "name": "Colossians",
+      "chapters": 4,
+      "verses": 95,
+      "sha256": "922b8a4786a79ead79d8f2825709d1a4cab8d9b54063416f4885acd052b711f9"
+    },
+    {
+      "number": 52,
+      "name": "1 Thessalonians",
+      "chapters": 5,
+      "verses": 89,
+      "sha256": "c430721accd11b4f4dabeb3476169255511f60f6c52983f18588699266afa873"
+    },
+    {
+      "number": 53,
+      "name": "2 Thessalonians",
+      "chapters": 3,
+      "verses": 47,
+      "sha256": "a01be7659dbe572351ea8a855511e180788dd0d2960ea6ceb69df46d991f8958"
+    },
+    {
+      "number": 54,
+      "name": "1 Timothy",
+      "chapters": 6,
+      "verses": 113,
+      "sha256": "2ad29b191b5a9fafabd8e1c52c218f0226201a016d14d0bad37e4ea17e4388aa"
+    },
+    {
+      "number": 55,
+      "name": "2 Timothy",
+      "chapters": 4,
+      "verses": 83,
+      "sha256": "3ce1561d0f8f5b40249028cba6c4cc24b02e1b98fa94ee496a7472eb6e33d1a0"
+    },
+    {
+      "number": 56,
+      "name": "Titus",
+      "chapters": 3,
+      "verses": 46,
+      "sha256": "71aff7e437ec5f92d2e5270544c8e0d644d82fdd629137377f344a71748fd52d"
+    },
+    {
+      "number": 57,
+      "name": "Philemon",
+      "chapters": 1,
+      "verses": 25,
+      "sha256": "9eacdd2b97a69ace33ca731b483ba36dea5a020c707c23233c540e47049d048b"
+    },
+    {
+      "number": 58,
+      "name": "Hebrews",
+      "chapters": 13,
+      "verses": 303,
+      "sha256": "054744d1d1c6309dbf6e54cbc052ff92d460ac3e3395c220388df02af40b530a"
+    },
+    {
+      "number": 59,
+      "name": "James",
+      "chapters": 5,
+      "verses": 108,
+      "sha256": "1737c212b9ded8854dfe83d68296c54fc653ea9d016c98043e0da06e17621252"
+    },
+    {
+      "number": 60,
+      "name": "1 Peter",
+      "chapters": 5,
+      "verses": 105,
+      "sha256": "b8fe92a893092b9a043c48060483c7735b5c518fc64e1d20d3f29ba3d16996c2"
+    },
+    {
+      "number": 61,
+      "name": "2 Peter",
+      "chapters": 3,
+      "verses": 61,
+      "sha256": "3777459f0f64f46e14caa7ec9491bca6b82c3c205e18b069ec52f2a1282563fb"
+    },
+    {
+      "number": 62,
+      "name": "1 John",
+      "chapters": 5,
+      "verses": 105,
+      "sha256": "c382078681d42fe0c9e464789814d51eaf6dcb61c66773c159cf7e3e02e3895b"
+    },
+    {
+      "number": 63,
+      "name": "2 John",
+      "chapters": 1,
+      "verses": 13,
+      "sha256": "0013ce3b7d6eec368a395af9eccc8d20a0348d8dc512cb21ae44659209a3546c"
+    },
+    {
+      "number": 64,
+      "name": "3 John",
+      "chapters": 1,
+      "verses": 14,
+      "sha256": "0c047ccf6c8476c6ac3398ca50e2e3edceec875078e64dee0204ea104d8ace1e"
+    },
+    {
+      "number": 65,
+      "name": "Jude",
+      "chapters": 1,
+      "verses": 25,
+      "sha256": "31724745912c7972118eaf610e18d4cbdf376dac9e97e41ef188b25be060a026"
+    },
+    {
+      "number": 66,
+      "name": "Revelation",
+      "chapters": 22,
+      "verses": 404,
+      "sha256": "db34c223ddb69a860ce71218069da5fe255aad0576bacd849cb70dac1a7c55d3"
+    }
+  ]
+}

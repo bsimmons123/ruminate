@@ -1,0 +1,13 @@
+Young's Literal Translation (1898)
+
+Source distribution license: Public Domain
+
+Young's Literal Translation
+ of the Holy Bible
+ by Robert Young, 1862, 1898
+ (Author of the Young's Analytical Concordance)
+
+ Printed copy available from Baker Publishing
+ Grand Rapids, Mi. 49516
+
+Source: https://api.getbible.net/v2/ylt.json

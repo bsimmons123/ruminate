@@ -1,0 +1,11 @@
+World English Bible Classic
+
+The text is in the public domain. World English Bible is a trademark of eBible.org.
+The publisher permits copying, distribution, and commercial use. If the actual text
+is changed, do not call the changed text World English Bible.
+
+Publisher notice: https://ebible.org/eng-web/copr.htm
+Source: https://ebible.org/Scriptures/eng-web_vpl.zip
+
+This bundle includes the 66 books used by Ruminate. Verse text is preserved as
+provided in the publisher's verse-per-line export. That export omits notes and formatting.

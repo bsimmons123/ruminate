@@ -14,7 +14,9 @@
     "mobile:sync:prod": "node scripts/sync-mobile-production.mjs",
     "mobile:android": "npm run mobile:sync && cap open android",
     "mobile:ios": "npm run mobile:sync && cap open ios",
-    "push:test": "node scripts/send-test-push.mjs"
+    "push:test": "node scripts/send-test-push.mjs",
+    "test:bible": "node --test tests/web-bible.test.mjs",
+    "test:offline": "playwright test"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
@@ -36,6 +38,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.3",
+    "@playwright/test": "^1.64.1",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "typescript": "latest"

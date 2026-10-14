@@ -69,7 +69,14 @@ jobs:
           docker run --rm --entrypoint node -e EXPECTED_ARCH "$IMAGE@$DIGEST" -e '
             require("node:assert/strict").equal(process.arch, process.env.EXPECTED_ARCH);
             for (const dependency of ["express", "pg", "jsonwebtoken", "bcryptjs", "firebase-admin"]) require(dependency);
-            console.log("Native runtime and server dependencies loaded on " + process.arch);
+            (async () => {
+              const { getBibleBook, getBibleManifest } = await import("./server/bundled-bible.js");
+              for (const translation of ["web", "kjv", "asv", "ylt"]) {
+                require("node:assert/strict").equal((await getBibleManifest(translation)).books.length, 66);
+                require("node:assert/strict").equal((await getBibleBook(translation, 66)).at(-1).verse, 21);
+              }
+              console.log("Native runtime, dependencies and bundled Bible text loaded on " + process.arch);
+            })().catch(error => { console.error(error); process.exitCode = 1; });
           '
 
       - name: Export image digest
