@@ -12,7 +12,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers);
   headers.set("Content-Type", "application/json");
   for (const [key, value] of Object.entries(apiAuthHeaders())) headers.set(key, value);
-  if (native) headers.set("X-Selah-Native", "true");
+  if (native) headers.set("X-Ruminate-Native", "true");
   const response = await fetch(apiUrl(path), { ...options, credentials: apiCredentials, headers });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) { const error = new Error(data.error || "The server could not complete that request.") as Error & { status: number }; error.status = response.status; throw error; }
