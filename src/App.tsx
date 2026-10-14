@@ -166,21 +166,35 @@ function App() {
   }} />;
 
   async function updateSettings(next: UserSettings) { if (isNativeApp && next.reminders && !await enablePush()) { notify("Could not enable reminders. Check notification permission and connection."); return; } if (isNativeApp && !next.reminders && settings?.reminders) await disablePush(); if (serverEnabled) await apiPut("settings", "preferences", next); else await saveSettings(next); setUserSettings(next); notify("Settings saved"); }
-  async function signOut() { if (isNativeApp) await disablePush(); if (serverEnabled) await apiSignOut(); localStorage.removeItem(SESSION_KEY); setUser(null); setPage("home"); }
+  async function signOut() {
+    if (isNativeApp) { try { await disablePush(); } catch (error) { console.error("Could not unregister push notifications", error); } }
+    try { if (serverEnabled) await apiSignOut(); }
+    catch (error) { if (!isNativeApp) { notify("Could not sign out. Please try again."); return; } console.error("Could not notify the server about sign out", error); }
+    localStorage.removeItem(SESSION_KEY);
+    setUser(null);
+    setUserSettings(null);
+    setLibrary([]);
+    setHistory([]);
+    setCatalog(verses);
+    setMenu(false);
+    setPage("home");
+  }
 
   return (
     <div className="app-shell">
       {page !== "reels" && <header>
         <button className="brand" onClick={() => navigate("home")}><span className="brand-mark">S</span><span>Selah<small>scripture memory</small></span></button>
         <nav className={menu ? "open" : ""}>
+          <div className="mobile-account"><strong>{user.name}</strong><span>{user.email}</span></div>
           <button className={page === "home" ? "active" : ""} onClick={() => navigate("home")}>Today</button>
           <button onClick={() => navigate("reels")}>Reels</button>
           <button className={page === "store" ? "active" : ""} onClick={() => navigate("store")}>Verse Store</button>
           <button className={page === "library" ? "active" : ""} onClick={() => navigate("library")}>My Library</button>
           <button className={page === "history" ? "active" : ""} onClick={() => navigate("history")}>Progress</button>
           <button className={page === "settings" ? "active" : ""} onClick={() => navigate("settings")}>Settings</button>
+          <button className="mobile-signout" onClick={() => void signOut()}><LogOut size={18}/> Sign out</button>
         </nav>
-        <div className="header-actions"><button className="streak" title={streak ? `${streak} consecutive review ${streak === 1 ? "day" : "days"}` : "Complete a review to begin your streak"}><Flame size={16} /> {streak} {streak === 1 ? "day" : "days"}</button><button className="avatar" onClick={() => navigate("settings")}>{user.name.split(" ").map(part => part[0]).join("").slice(0,2).toUpperCase()}</button><button className="menu" onClick={() => setMenu(v => !v)}>{menu ? <X /> : <Menu />}</button></div>
+        <div className="header-actions"><button className="streak" title={streak ? `${streak} consecutive review ${streak === 1 ? "day" : "days"}` : "Complete a review to begin your streak"}><Flame size={16} /> {streak} {streak === 1 ? "day" : "days"}</button><button className="avatar" onClick={() => navigate("settings")}>{user.name.split(" ").map(part => part[0]).join("").slice(0,2).toUpperCase()}</button><button className="menu" aria-label={menu ? "Close menu" : "Open menu"} aria-expanded={menu} onClick={() => setMenu(v => !v)}>{menu ? <X /> : <Menu />}</button></div>
       </header>}
 
       <main>
