@@ -154,3 +154,23 @@ test("a visitor can read all bundled translations offline without accessing acco
   await expect(page.getByRole("button", { name: "Pin to memorize", exact: true })).toHaveCount(0);
   expect(await page.getByRole("combobox", { name: "Translation" }).locator("option").allTextContents()).not.toContain("ESV");
 });
+
+test("merged iOS shell keeps offline Memory Bank practice and native authentication", async ({ page, context }) => {
+  await page.addInitScript(() => {
+    (window as any).CapacitorCustomPlatform = { name: "ios" };
+    localStorage.setItem("selah-native-session", "test-native-session");
+  });
+  await fixtures(page);
+  const authentication = page.waitForRequest(request => request.url().endsWith("/api/auth/me"));
+  await page.goto("/");
+  expect((await authentication).headers()["x-ruminate-native"]).toBe("true");
+  await expect(page.locator("html")).toHaveClass(/native.*ios/);
+  await page.getByRole("button", { name: "More", exact: true }).click();
+  await page.getByRole("dialog", { name: "More" }).getByRole("button", { name: "Progress", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Your Progress" })).toBeVisible();
+  await context.setOffline(true);
+  await recall(page);
+  await expect(page.getByRole("status")).toContainText("Saved on this device");
+  expect((await outbox(page)).filter(change => change.kind === "review")).toHaveLength(1);
+  await page.screenshot({ path: "test-results/offline-native-ios.png", fullPage: true, animations: "disabled" });
+});
