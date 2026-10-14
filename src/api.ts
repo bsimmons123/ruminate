@@ -35,7 +35,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers);
   headers.set("Content-Type", "application/json");
   for (const [key, value] of Object.entries(apiAuthHeaders())) headers.set(key, value);
-  if (native) headers.set("X-Selah-Native", "true");
+  if (native) headers.set("X-Ruminate-Native", "true");
   const controller = new AbortController();
   const timeout = options?.signal ? undefined : window.setTimeout(() => controller.abort(), 10000);
   let response: Response;

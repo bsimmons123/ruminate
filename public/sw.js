@@ -1,6 +1,6 @@
 const SHELL_CACHE = "ruminate-shell-v4";
 const BIBLE_CACHE = "ruminate-scripture-v1";
-const SHELL = ["/", "/manifest.webmanifest", "/icons/ruminate.svg", "/icons/ruminate-maskable.svg"];
+const SHELL = ["/", "/manifest.webmanifest", "/icons/ruminate.svg", "/icons/ruminate-maskable.svg", "/fonts/dm-sans-latin.woff2", "/fonts/dm-sans-latin-ext.woff2", "/fonts/gilda-display-latin.woff2", "/fonts/gilda-display-latin-ext.woff2"];
 const TRANSLATIONS = ["web", "kjv", "asv", "ylt"];
 const BIBLE_FILES = TRANSLATIONS.flatMap(translation => [...Array.from({ length: 66 }, (_, index) => `/bible/${translation}/${index + 1}.json`), `/bible/${translation}/manifest.json`, `/bible/${translation}/LICENSE.txt`]);
 self.addEventListener("install", event => {
