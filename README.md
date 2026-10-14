@@ -1,35 +1,32 @@
+<img src="assets/logo.svg" alt="Selah logo" width="80">
+
 # Selah
 
-A mobile-first Scripture memorization app with a searchable Verse Store, curated collections, a personal library, and spaced-repetition review sessions.
+[![CI](https://github.com/bsimmons123/selah/actions/workflows/ci.yml/badge.svg)](https://github.com/bsimmons123/selah/actions/workflows/ci.yml) [![Android release](https://github.com/bsimmons123/selah/actions/workflows/publish-android.yml/badge.svg)](https://github.com/bsimmons123/selah/actions/workflows/publish-android.yml)
 
-## Run locally
+Selah helps you memorize Scripture through daily review and an easy-to-browse Bible feed. Study on the web or in the native Android and iOS projects, with your library and progress saved to your account.
+
+**[Open the web app](https://selah.simmonsweb.com/)** · **[Download the Android APK](https://github.com/bsimmons123/selah/releases/latest)** · **[Report an issue](https://github.com/bsimmons123/selah/issues)**
+
+## Features
+
+- **Memorize:** Save verses to your library, review with multiple-choice or free-text exercises, and schedule your next practice with Again, Hard, Good, or Easy.
+- **Explore:** Search the Verse Store and scroll Scripture Reels or ordered Bible-book feeds from Genesis to Revelation.
+- **Track progress:** See review history, accuracy trends, verse mastery, and personal collections.
+- **Choose a translation:** Read public-domain KJV passages or look up individual ESV passages through Crossway's API when configured.
+- **Keep practicing:** Sign in across devices and enable native push reminders for verses due for review when a push provider is configured.
+
+## Quick start
 
 ```bash
-npm install
-npm run dev
+git clone https://github.com/bsimmons123/selah.git
+cd selah
+cp .env.example .env
+# Set POSTGRES_PASSWORD and JWT_SECRET in .env.
+docker compose up --build
 ```
 
-Then open `http://localhost:5173`.
-
-## Included in this MVP
-
-- Searchable, topic-filtered Verse Store
-- Previewable curated and PostgreSQL-backed community collections
-- Private user-created verse tags with library filtering
-- Persistent personal library stored in PostgreSQL
-- Interactive reviews with multiple-choice Easy mode and graded free-text Hard mode
-- Again / Hard / Good / Easy review scheduling
-- Library collections and mastery progress
-- Responsive desktop and mobile navigation
-- Seeded public-domain KJV passages
-- Whole-Bible KJV passage lookup through GetBible
-- Optional ESV lookup through Crossway's official API
-- Persistent attempt history, accuracy trends, and per-verse improvement
-- Vertical Scripture Reels feed with scroll snapping and one-tap pinning
-- Book Reels carousel with selectable Genesis-to-Revelation titles and ordered verse feeds
-- Installable mobile PWA with standalone display, home-screen icons, safe-area support, and offline app-shell caching
-- Persistent KJV/ESV preference with room for future translation providers
-- Server-backed account sign-up, sign-in, and personalized settings
+Open `http://localhost:3001`. For frontend development, run `npm ci` and `npm run dev` after the API is running, then open `http://localhost:5173`.
 
 ## Production build
 
@@ -65,8 +62,6 @@ Pushes to `master` in `bsimmons123/selah` run `.github/workflows/publish-android
 - In the native app, sign in and enable **Daily reminders** in Settings. The device registers its token and time zone with Selah. The API checks once per minute and sends one reminder at 9 a.m. local time when a verse is due. Turning reminders off or signing out removes that device's token. Push requires a real configured device and provider credentials; the iOS simulator cannot receive APNs push.
 
 Keep Firebase and Apple keys outside source control. The browser and PWA show the reminder toggle as unavailable because this implementation uses native push.
-
-The native projects and backend remain local until you choose a reachable API endpoint. No publishing step is part of this workflow.
 
 ### Test on a Pixel over USB
 
@@ -153,3 +148,14 @@ These controls are intentionally conservative. Crossway's upstream API remains t
 ## Authentication and data isolation
 
 Authentication is provided by the project’s own Express API and PostgreSQL database. Passwords are hashed server-side with bcrypt and never returned to the browser. Successful authentication creates a signed, HTTP-only, same-site cookie. Every library, passage, review, and settings query includes the authenticated user ID, and the database uses a composite `(user_id, kind, item_id)` primary key so records cannot collide across accounts.
+
+## Project layout
+
+- `src/` — React interface, Scripture reading, and review flows.
+- `server/` — Express API, PostgreSQL schema, and reminder scheduler.
+- `android/` and `ios/` — Capacitor native projects.
+- `.github/workflows/` — CI, container publishing, and signed Android releases.
+
+## License
+
+Selah is available under the [Selah Noncommercial Use License](LICENSE). Bible translations retain their publishers' respective rights and terms.
