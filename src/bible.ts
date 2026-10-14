@@ -43,7 +43,10 @@ export async function fetchPassage(reference: string, translation: Translation):
   return { id: `${translation.toLowerCase()}-${reference.toLowerCase().replace(/[^a-z0-9]+/g,"-")}`, reference, book: reference.replace(/\s+\d.*$/, ""), chapter: Number(reference.match(/\d+/)?.[0] || 1), verse: reference.split(":")[1] || "1", text: cleanApiText(text), translation, topics: ["Imported"] };
 }
 
-export async function fetchBibleBook(book: string, translation: Exclude<Translation, "ESV"> = "KJV"): Promise<Verse[]> {
+const bookCache = new Map<string, Verse[]>();
+const bookRequests = new Map<string, Promise<Verse[]>>();
+
+async function loadBibleBook(book: string, translation: Exclude<Translation, "ESV">): Promise<Verse[]> {
   const bookIndex = bibleBooks.findIndex(([name]) => name === book);
   if (bookIndex < 0) throw new Error("That Bible book was not recognized.");
   let response = await fetch(apiUrl(`/bible/${translation.toLowerCase()}/book/${bookIndex + 1}`), { credentials: apiCredentials, headers: apiAuthHeaders() });
@@ -59,7 +62,25 @@ export async function fetchBibleBook(book: string, translation: Exclude<Translat
     const visit = (value: any) => { if (!value || typeof value !== "object") return; if (typeof value.text === "string" && Number.isFinite(Number(value.chapter)) && Number.isFinite(Number(value.verse))) found.push({ chapter: Number(value.chapter), verse: Number(value.verse), text: value.text.trim() }); else Object.values(value).forEach(visit); };
     visit(data); data = found.sort((a, b) => a.chapter - b.chapter || a.verse - b.verse);
   }
-  return (data as { chapter: number; verse: number; text: string }[]).map(item => ({ id: `${translation.toLowerCase()}-${book.toLowerCase().replace(/[^a-z0-9]+/g,"-")}-${item.chapter}-${item.verse}`, reference: `${book} ${item.chapter}:${item.verse}`, book, chapter: item.chapter, verse: String(item.verse), text: item.text, translation, topics: ["Book reading"] }));
+  const verses = (data as { chapter: number; verse: number; text: string }[]).map(item => ({ id: `${translation.toLowerCase()}-${book.toLowerCase().replace(/[^a-z0-9]+/g,"-")}-${item.chapter}-${item.verse}`, reference: `${book} ${item.chapter}:${item.verse}`, book, chapter: item.chapter, verse: String(item.verse), text: item.text, translation, topics: ["Book reading"] }));
+  if (!verses.length) throw new Error(`${book} has no available ${translation} verses.`);
+  return verses;
+}
+
+export async function fetchBibleBook(book: string, translation: Exclude<Translation, "ESV"> = "KJV"): Promise<Verse[]> {
+  const key = `${translation}:${book}`;
+  const cached = bookCache.get(key);
+  if (cached) return cached;
+  const pending = bookRequests.get(key);
+  if (pending) return pending;
+  const request = loadBibleBook(book, translation);
+  bookRequests.set(key, request);
+  try {
+    const verses = await request;
+    if (bookCache.size >= 8) bookCache.delete(bookCache.keys().next().value!);
+    bookCache.set(key, verses);
+    return verses;
+  } finally { bookRequests.delete(key); }
 }
 
 export const fetchKjvBook = (book: string) => fetchBibleBook(book, "KJV");
