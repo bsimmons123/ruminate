@@ -167,3 +167,5 @@ Mark a verse as memorized in My Library, or reach stage 6 with at least 90% accu
 ## Rename compatibility
 
 Ruminate retains the existing `com.selah.scripturememory` installation ID, signing key, saved-data keys, database names, and Compose deployment identity so existing installs and deployments keep their accounts and progress. The API remains at `https://selah.simmonsweb.com` until a new domain is configured. New container images are published under `ghcr.io/bsimmons123/ruminate`.
+
+Container publication builds AMD64 on `ubuntu-24.04` and ARM64 on `ubuntu-24.04-arm`. Each image must load Node and the server dependencies on its native runner before the combined `latest` and commit tags are published. This avoids running Node under QEMU during dependency installation.
