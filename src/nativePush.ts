@@ -8,6 +8,7 @@ let registeredThisSession = false;
 let completeRegistration: ((registered: boolean) => void) | null = null;
 
 export const isNativeApp = Capacitor.isNativePlatform();
+export const currentPushToken = () => localStorage.getItem(DEVICE_TOKEN_KEY);
 
 export async function enablePush() {
   if (!isNativeApp) return false;
@@ -40,11 +41,10 @@ export async function enablePush() {
   return registeredThisSession;
 }
 
-export async function disablePush() {
+export async function disablePush(removeFromServer = true) {
   if (!isNativeApp) return;
   const token = localStorage.getItem(DEVICE_TOKEN_KEY);
-  if (token) { try { await apiRemoveDevice(token); } catch (error) { console.error("Device removal failed", error); } }
+  if (token && removeFromServer) { try { await apiRemoveDevice(token); } catch (error) { console.error("Device removal failed", error); } }
   localStorage.removeItem(DEVICE_TOKEN_KEY);
   registeredThisSession = false;
-  await PushNotifications.unregister();
 }

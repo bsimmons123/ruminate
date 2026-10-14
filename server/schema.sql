@@ -29,6 +29,12 @@ create table if not exists push_devices (
 );
 create index if not exists push_devices_user on push_devices(user_id);
 
+create table if not exists revoked_sessions (
+  token_hash text primary key,
+  expires_at timestamptz not null
+);
+create index if not exists revoked_sessions_expiry on revoked_sessions(expires_at);
+
 create table if not exists esv_requests (
   id bigserial primary key,
   requested_at timestamptz not null default now()

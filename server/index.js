@@ -6,6 +6,7 @@ import pg from "pg";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash, randomUUID } from "node:crypto";
 import { startReminderScheduler } from "./reminders.js";
 
 const app = express();
@@ -28,12 +29,40 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: "256kb" })); app.use(cookieParser());
 
 function safeUser(row) { return { id: row.id, name: row.name, email: row.email, createdAt: row.created_at }; }
-function setSession(req, res, user) { const token = jwt.sign({ sub: user.id }, jwtSecret, { expiresIn: "30d" }); if (req.get("X-Selah-Native") === "true") return { ...safeUser(user), token }; res.cookie("selah_session", token, { httpOnly: true, sameSite: "lax", secure: process.env.COOKIE_SECURE === "true", maxAge: 30 * 86400000 }); return safeUser(user); }
-function requireUser(req, res, next) { try { const bearer = req.get("Authorization")?.match(/^Bearer (.+)$/i)?.[1]; const token = bearer || req.cookies.selah_session; if (!token) throw new Error(); req.userId = jwt.verify(token, jwtSecret).sub; next(); } catch { res.status(401).json({ error: "Please sign in to continue." }); } }
+function setSession(req, res, user) { const token = jwt.sign({ sub: user.id, jti: randomUUID() }, jwtSecret, { expiresIn: "30d" }); if (req.get("X-Selah-Native") === "true") return { ...safeUser(user), token }; res.cookie("selah_session", token, { httpOnly: true, sameSite: "lax", secure: process.env.COOKIE_SECURE === "true", maxAge: 30 * 86400000 }); return safeUser(user); }
+function sessionHash(token) { return createHash("sha256").update(token).digest("hex"); }
+async function requireUser(req, res, next) {
+  const token = req.get("Authorization")?.match(/^Bearer (.+)$/i)?.[1] || req.cookies.selah_session;
+  let payload;
+  try { if (!token) throw new Error(); payload = jwt.verify(token, jwtSecret); }
+  catch { return res.status(401).json({ error: "Please sign in to continue." }); }
+  try {
+    const { rows } = await pool.query("select 1 from revoked_sessions where token_hash=$1 and expires_at > now()", [sessionHash(token)]);
+    if (rows.length) return res.status(401).json({ error: "This session has been signed out." });
+    req.userId = payload.sub; req.sessionToken = token; req.sessionExpiresAt = new Date(payload.exp * 1000);
+    next();
+  } catch (error) { next(error); }
+}
 
 app.post("/api/auth/signup", async (req, res) => { try { const { name, email, password } = req.body; if (!name?.trim() || !email?.includes("@") || password?.length < 8) return res.status(400).json({ error: "Enter a name, valid email, and password of at least 8 characters." }); const hash = await bcrypt.hash(password, 12); const { rows } = await pool.query("insert into users(name,email,password_hash) values($1,$2,$3) returning *", [name.trim(), email.trim().toLowerCase(), hash]); res.status(201).json(setSession(req, res, rows[0])); } catch (error) { res.status(error.code === "23505" ? 409 : 500).json({ error: error.code === "23505" ? "An account with that email already exists." : "Account creation failed." }); } });
 app.post("/api/auth/signin", async (req, res) => { const { rows } = await pool.query("select * from users where email=$1", [req.body.email?.trim().toLowerCase()]); if (!rows[0] || !await bcrypt.compare(req.body.password || "", rows[0].password_hash)) return res.status(401).json({ error: "That email and password combination wasn’t found." }); res.json(setSession(req, res, rows[0])); });
-app.post("/api/auth/signout", (_req, res) => { res.clearCookie("selah_session"); res.json({ ok: true }); });
+app.post("/api/auth/signout", requireUser, async (req, res, next) => {
+  const client = await pool.connect().catch(next);
+  if (!client) return;
+  try {
+    await client.query("begin");
+    const deviceToken = req.body?.deviceToken;
+    if (typeof deviceToken === "string" && deviceToken.length >= 16 && deviceToken.length <= 4096) {
+      await client.query("delete from push_devices where token=$1 and user_id=$2", [deviceToken, req.userId]);
+    }
+    await client.query("insert into revoked_sessions(token_hash,expires_at) values($1,$2) on conflict(token_hash) do nothing", [sessionHash(req.sessionToken), req.sessionExpiresAt]);
+    await client.query("delete from revoked_sessions where expires_at < now()");
+    await client.query("commit");
+    res.clearCookie("selah_session", { sameSite: "lax", secure: process.env.COOKIE_SECURE === "true" });
+    res.json({ ok: true });
+  } catch (error) { await client.query("rollback").catch(() => {}); next(error); }
+  finally { client.release(); }
+});
 app.get("/api/auth/me", requireUser, async (req, res) => { const { rows } = await pool.query("select * from users where id=$1", [req.userId]); res.json(rows[0] ? safeUser(rows[0]) : null); });
 
 app.get("/api/data/:kind", requireUser, async (req, res) => { if (!validKinds.has(req.params.kind)) return res.status(400).json({ error: "Invalid data type." }); const { rows } = await pool.query("select data from user_data where user_id=$1 and kind=$2 order by updated_at desc", [req.userId, req.params.kind]); res.json(rows.map(row => row.data)); });

@@ -43,6 +43,22 @@ export async function fetchPassage(reference: string, translation: Translation):
   return { id: `${translation.toLowerCase()}-${reference.toLowerCase().replace(/[^a-z0-9]+/g,"-")}`, reference, book: reference.replace(/\s+\d.*$/, ""), chapter: Number(reference.match(/\d+/)?.[0] || 1), verse: reference.split(":")[1] || "1", text: cleanApiText(text), translation, topics: ["Imported"] };
 }
 
+export async function fetchPassageVerses(reference: string, translation: Exclude<Translation, "ESV">): Promise<Verse[]> {
+  const response = await fetch(`https://query.getbible.net/v2/${translation.toLowerCase()}/${encodeURIComponent(reference)}`);
+  if (!response.ok) throw new Error(`${translation} passage could not be loaded`);
+  const data = await readJson(response, `${translation} passage could not be loaded.`);
+  const entries = Object.values(data) as { book_name?: string; verses?: { chapter: number; verse: number; text: string }[] }[];
+  const fallback = reference.match(/^(.+?)\s+(\d+):(\d+)/);
+  const book = entries[0]?.book_name || fallback?.[1];
+  if (!book) throw new Error("No passage was found for that reference");
+  const verses = entries.flatMap(entry => entry.verses || []).map(item => ({
+    id: `${translation.toLowerCase()}-${book.toLowerCase().replace(/[^a-z0-9]+/g,"-")}-${item.chapter}-${item.verse}`,
+    reference: `${book} ${item.chapter}:${item.verse}`, book, chapter: item.chapter, verse: String(item.verse), text: cleanApiText(item.text), translation, topics: ["Book reading"]
+  }));
+  if (!verses.length) throw new Error("No passage was found for that reference");
+  return verses;
+}
+
 const bookCache = new Map<string, Verse[]>();
 const bookRequests = new Map<string, Promise<Verse[]>>();
 
