@@ -18,6 +18,7 @@ export type LibraryItem = {
   nextReview: string;
   collection: string;
   tags?: string[];
+  memorized?: boolean;
 };
 
 export type CommunityCollection = { id: string; title: string; description: string; curator: string; category: string; verseIds: string[]; featured: boolean };

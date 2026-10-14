@@ -19,7 +19,7 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && ["https://localhost", "capacitor://localhost", "http://localhost"].includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Selah-Native");
+    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Ruminate-Native");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
     res.setHeader("Vary", "Origin");
   }
@@ -29,7 +29,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: "256kb" })); app.use(cookieParser());
 
 function safeUser(row) { return { id: row.id, name: row.name, email: row.email, createdAt: row.created_at }; }
-function setSession(req, res, user) { const token = jwt.sign({ sub: user.id, jti: randomUUID() }, jwtSecret, { expiresIn: "30d" }); if (req.get("X-Selah-Native") === "true") return { ...safeUser(user), token }; res.cookie("selah_session", token, { httpOnly: true, sameSite: "lax", secure: process.env.COOKIE_SECURE === "true", maxAge: 30 * 86400000 }); return safeUser(user); }
+function setSession(req, res, user) { const token = jwt.sign({ sub: user.id, jti: randomUUID() }, jwtSecret, { expiresIn: "30d" }); if (req.get("X-Ruminate-Native") === "true") return { ...safeUser(user), token }; res.cookie("selah_session", token, { httpOnly: true, sameSite: "lax", secure: process.env.COOKIE_SECURE === "true", maxAge: 30 * 86400000 }); return safeUser(user); }
 function sessionHash(token) { return createHash("sha256").update(token).digest("hex"); }
 async function requireUser(req, res, next) {
   const token = req.get("Authorization")?.match(/^Bearer (.+)$/i)?.[1] || req.cookies.selah_session;
@@ -84,10 +84,10 @@ app.get("/api/bible/:translation/book/:number", requireUser, async (req, res) =>
 
 app.get("/api/esv", requireUser, async (req, res) => { try { if (!process.env.ESV_API_KEY) return res.status(503).json({ error: "ESV_API_KEY is not configured." }); const query = String(req.query.q || ""); if (!/^.+\s\d+:\d+(?:-\d+)?$/.test(query)) return res.status(400).json({ error: "Use a single-chapter reference such as John 3:16-18." }); const { rows } = await pool.query("select count(*) filter (where requested_at > now() - interval '1 minute')::int as minute, count(*) filter (where requested_at > now() - interval '1 hour')::int as hour, count(*) filter (where requested_at > now() - interval '1 day')::int as day from esv_requests"); if (rows[0].minute >= 60 || rows[0].hour >= 1000 || rows[0].day >= 5000) return res.status(429).json({ error: "ESV request limit reached. Please try again later." }); await pool.query("insert into esv_requests default values"); const upstream = await fetch(`https://api.esv.org/v3/passage/text/?q=${encodeURIComponent(query)}&include-headings=false&include-footnotes=false&include-verse-numbers=false&include-passage-references=false&include-short-copyright=false`, { headers: { Authorization: `Token ${process.env.ESV_API_KEY}` } }); const data = await upstream.json(); res.status(upstream.status).json(upstream.ok ? { reference: data.canonical, text: data.passages?.[0] || "" } : { error: data.detail || "ESV request failed" }); } catch (error) { console.error("ESV route failed:", error instanceof Error ? error.message : error); res.status(500).json({ error: "ESV passage could not be loaded." }); } });
 
-app.use("/api", (_req, res) => res.status(404).json({ error: "API route not found. Restart Selah after updating the application." }));
+app.use("/api", (_req, res) => res.status(404).json({ error: "API route not found. Restart Ruminate after updating the application." }));
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."); app.use(express.static(path.join(root, "dist"), { setHeaders(res, file) { if (file.includes(`${path.sep}assets${path.sep}`)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable"); } })); app.use((_req, res) => res.sendFile(path.join(root, "dist", "index.html")));
 async function ensureCurrentSchema() {
   const schema = await readFile(new URL("./schema.sql", import.meta.url), "utf8");
   await pool.query(schema);
 }
-ensureCurrentSchema().then(() => { app.listen(port, "0.0.0.0", () => console.log(`Selah listening on ${port}`)); startReminderScheduler(pool); }).catch(error => { console.error("Database connection failed", error); process.exit(1); });
+ensureCurrentSchema().then(() => { app.listen(port, "0.0.0.0", () => console.log(`Ruminate listening on ${port}`)); startReminderScheduler(pool); }).catch(error => { console.error("Database connection failed", error); process.exit(1); });

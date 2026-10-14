@@ -9,12 +9,14 @@ import { apiCollections, apiCommunityTags, apiCurrentUser, apiDelete, apiItems, 
 import { currentPushToken, disablePush, enablePush, isNativeApp } from "./nativePush";
 import { App as NativeApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
+import { MemoryBankPage } from "./components/MemoryBankPage";
 import type { CommunityCollection, LibraryItem, ReviewRating, ReviewResult, Translation, User, UserSettings, Verse } from "./types";
 
-type Page = "home" | "reels" | "store" | "library" | "history" | "settings" | "review";
+type Page = "home" | "reels" | "store" | "library" | "memory-bank" | "history" | "settings" | "review";
 type ExerciseSummary = Pick<ReviewResult, "mode" | "correct" | "total" | "percentage" | "answers">;
 
 const starterIds = ["ps-46-10", "prov-3-5-6", "john-3-16"];
+const isMemorized = (item: LibraryItem) => item.memorized ?? item.stage >= 6;
 const normalizeTranslation = (value: string | undefined): Translation => translations.some(item => item.id === value) ? value as Translation : "KJV";
 
 function reviewStreak(results: ReviewResult[]) {
@@ -41,7 +43,10 @@ function App() {
   const [query, setQuery] = useState("");
   const [topic, setTopic] = useState("All");
   const [toast, setToast] = useState("");
+  const reviewSaving = useRef(false);
   const [reviewIndex, setReviewIndex] = useState(0);
+  const [quizIds, setQuizIds] = useState<string[] | null>(null);
+  const [reviewReturn, setReviewReturn] = useState<Page>("home");
   const [menu, setMenu] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
@@ -67,17 +72,18 @@ function App() {
       } else setLibrary(items);
       setReady(true);
     }
-    void load().catch(error => { setStartupError(error instanceof Error ? error.message : "Selah could not load your library."); setReady(true); });
+    void load().catch(error => { setStartupError(error instanceof Error ? error.message : "Ruminate could not load your library."); setReady(true); });
   }, []);
   useEffect(() => { const update = () => setOnline(navigator.onLine); window.addEventListener("online", update); window.addEventListener("offline", update); return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); }; }, []);
   useEffect(() => { if (user && settings?.reminders) void enablePush(); }, [user?.id, settings?.reminders]);
-  useEffect(() => { const openReview = () => { setReviewIndex(0); setPage("review"); }; window.addEventListener("selah-open-review", openReview); return () => window.removeEventListener("selah-open-review", openReview); }, []);
+  useEffect(() => { const openReview = () => { setQuizIds(null); setReviewReturn("home"); setReviewIndex(0); setPage("review"); }; window.addEventListener("selah-open-review", openReview); return () => window.removeEventListener("selah-open-review", openReview); }, []);
   useEffect(() => { currentPage.current = page; }, [page]);
   useEffect(() => { if (!isNativeApp || Capacitor.getPlatform() !== "android") return; let disposed = false; let remove: (() => Promise<void>) | undefined; void NativeApp.addListener("backButton", () => { if (currentPage.current === "home") void NativeApp.exitApp(); else { setPage("home"); setMenu(false); } }).then(handle => { if (disposed) void handle.remove(); else remove = () => handle.remove(); }); return () => { disposed = true; void remove?.(); }; }, []);
 
   const due = library.filter(item => new Date(item.nextReview) <= new Date());
   const streak = reviewStreak(history);
-  const reviewItems = library;
+  const reviewItems = quizIds ? quizIds.flatMap(id => { const item = library.find(value => value.verseId === id); return item ? [item] : []; }) : library;
+  const memorizedItems = library.filter(item => isMemorized(item) && catalog.some(verse => verse.id === item.verseId));
   const verseFor = (id: string) => catalog.find(v => v.id === id)!;
   const topics = ["All", ...Array.from(new Set(catalog.flatMap(v => v.topics)))];
   const filtered = useMemo(() => catalog.filter(v => {
@@ -130,32 +136,44 @@ function App() {
     notify(additions.length ? `${additions.length} verses added` : "This collection is already in your library");
   }
 
-  async function updateLibraryItem(item: LibraryItem) { if (serverEnabled) await apiPut("library", item.verseId, item); else await saveItem(item); setLibrary(current => current.map(value => value.verseId === item.verseId ? item : value)); }
+  async function updateLibraryItem(item: LibraryItem) { try { if (serverEnabled) await apiPut("library", item.verseId, item); else await saveItem(item); setLibrary(current => current.map(value => value.verseId === item.verseId ? item : value)); } catch (error) { notify("Could not save this verse. Please try again."); throw error; } }
 
   async function rate(rating: ReviewRating, summary: ExerciseSummary) {
     const current = reviewItems[reviewIndex];
-    if (!current) return;
-    const updated = scheduledItem(current, rating);
-    if (serverEnabled) await apiPut("library", updated.verseId, updated); else await saveItem(updated);
-    const result: ReviewResult = { id: crypto.randomUUID(), verseId: current.verseId, reviewedAt: new Date().toISOString(), rating, ...summary };
-    if (serverEnabled) await apiPut("review", result.id, result); else await saveReview(result);
-    setHistory(results => [result, ...results]);
-    setLibrary(items => items.map(item => item.verseId === updated.verseId ? updated : item));
-    if (reviewIndex < reviewItems.length - 1) {
-      setReviewIndex(i => i + 1);
-    } else {
-      setReviewIndex(0);
-      setPage("home");
-      notify("Review complete — well done");
-    }
+    if (!current || reviewSaving.current) return;
+    reviewSaving.current = true;
+    try {
+      const updated = scheduledItem(current, rating);
+      updated.memorized = isMemorized(current) || (updated.stage >= 6 && summary.percentage >= 90 && (rating === "good" || rating === "easy"));
+      if (serverEnabled) await apiPut("library", updated.verseId, updated); else await saveItem(updated);
+      const result: ReviewResult = { id: crypto.randomUUID(), verseId: current.verseId, reviewedAt: new Date().toISOString(), rating, ...summary };
+      if (serverEnabled) await apiPut("review", result.id, result); else await saveReview(result);
+      setHistory(results => [result, ...results]);
+      setLibrary(items => items.map(item => item.verseId === updated.verseId ? updated : item));
+      if (reviewIndex < reviewItems.length - 1) {
+        setReviewIndex(i => i + 1);
+      } else {
+        setReviewIndex(0);
+        setPage(reviewReturn);
+        setQuizIds(null);
+        notify(quizIds ? "Memory Bank quiz complete" : "Review complete — well done");
+      }
+    } catch { notify("Could not save your review. Please try again."); }
+    finally { reviewSaving.current = false; }
   }
 
   function navigate(next: Page) {
+    if (next === "review") { setReviewIndex(0); setQuizIds(null); setReviewReturn("home"); }
     setPage(next); setMenu(false); window.scrollTo({ top: 0, behavior: "smooth" });
   }
+  function startMemoryQuiz(items: LibraryItem[]) {
+    if (!items.length) return;
+    setQuizIds(shuffle(items.map(item => item.verseId))); setReviewIndex(0); setReviewReturn("memory-bank"); setPage("review"); setMenu(false);
+    window.scrollTo({ top: 0 });
+  }
 
-  if (!ready) return <div className="loading"><span>Selah</span><i /></div>;
-  if (startupError) return <main className="empty"><BookOpen/><h1>Could not open Selah</h1><p>{startupError}</p><button className="primary" onClick={() => window.location.reload()}>Try again</button></main>;
+  if (!ready) return <div className="loading"><span>Ruminate</span><i /></div>;
+  if (startupError) return <main className="empty"><BookOpen/><h1>Could not open Ruminate</h1><p>{startupError}</p><button className="primary" onClick={() => window.location.reload()}>Try again</button></main>;
   if (!user) return <AuthPage onAuthenticated={async activeUser => {
     localStorage.setItem(SESSION_KEY, activeUser.id); setUser(activeUser);
     const [savedLibrary, savedPassages, savedReviews, savedPreferences] = await Promise.all([apiItems<LibraryItem>("library"), apiItems<Verse>("passage"), apiItems<ReviewResult>("review"), apiItems<UserSettings>("settings")]);
@@ -177,6 +195,7 @@ function App() {
     setUser(null);
     setUserSettings(null);
     setLibrary([]);
+    setQuizIds(null);
     setHistory([]);
     setCatalog(verses);
     setMenu(false);
@@ -187,13 +206,14 @@ function App() {
   return (
     <div className="app-shell">
       {page !== "reels" && <header>
-        <button className="brand" onClick={() => navigate("home")}><span className="brand-mark">S</span><span>Selah<small>scripture memory</small></span></button>
+        <button className="brand" onClick={() => navigate("home")}><span className="brand-mark">R</span><span>Ruminate<small>scripture memory</small></span></button>
         <nav className={menu ? "open" : ""}>
           <div className="mobile-account"><strong>{user.name}</strong><span>{user.email}</span></div>
           <button className={page === "home" ? "active" : ""} onClick={() => navigate("home")}>Today</button>
           <button onClick={() => navigate("reels")}>Reels</button>
           <button className={page === "store" ? "active" : ""} onClick={() => navigate("store")}>Verse Store</button>
           <button className={page === "library" ? "active" : ""} onClick={() => navigate("library")}>My Library</button>
+          <button className={page === "memory-bank" ? "active" : ""} onClick={() => navigate("memory-bank")}>Memory Bank</button>
           <button className={page === "history" ? "active" : ""} onClick={() => navigate("history")}>Progress</button>
           <button className={page === "settings" ? "active" : ""} onClick={() => navigate("settings")}>Settings</button>
           <button className="mobile-signout" disabled={signingOut} onClick={() => void signOut()}><LogOut size={18}/> {signingOut ? "Signing out…" : "Sign out"}</button>
@@ -206,14 +226,15 @@ function App() {
         {page === "reels" && <ReelsPage catalog={catalog} library={library} translation={settings?.translation || "KJV"} onBack={() => navigate("home")} onPin={toggleVerse} onImport={importVerse} />}
         {page === "store" && <StorePage filtered={filtered} topics={topics} topic={topic} query={query} library={library} preferredTranslation={settings?.translation || "KJV"} onQuery={setQuery} onTopic={setTopic} onToggle={toggleVerse} onCollection={addCollection} onImport={importVerse} />}
         {page === "library" && <LibraryPage library={library} verseFor={verseFor} onRemove={toggleVerse} onUpdate={updateLibraryItem} onReview={() => navigate("review")} onStore={() => navigate("store")} />}
+        {page === "memory-bank" && <MemoryBankPage items={memorizedItems} verseFor={verseFor} onQuiz={startMemoryQuiz} onLibrary={() => navigate("library")} onUpdate={updateLibraryItem} />}
         {page === "history" && <HistoryPage history={history} verseFor={verseFor} />}
         {page === "settings" && settings && <SettingsPage user={user} settings={settings} onSave={updateSettings} onSignOut={signOut} signingOut={signingOut} />}
-        {page === "review" && <ReviewPage key={reviewItems[reviewIndex]?.verseId} items={reviewItems} index={reviewIndex} verse={reviewItems[reviewIndex] ? verseFor(reviewItems[reviewIndex].verseId) : undefined} onRate={rate} onClose={() => navigate("home")} />}
+        {page === "review" && <ReviewPage key={reviewItems[reviewIndex]?.verseId} items={reviewItems} index={reviewIndex} verse={reviewItems[reviewIndex] ? verseFor(reviewItems[reviewIndex].verseId) : undefined} onRate={rate} onClose={() => navigate(reviewReturn)} initialMode={quizIds ? "impossible" : "easy"} />}
       </main>
       {page !== "reels" && <div className="esv-global"><strong>Noncommercial Scripture-memory project</strong><p>Scripture quotations marked “ESV” are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved. The ESV text may not be quoted in any publication made available to the public by a Creative Commons license. The ESV may not be translated into any other language.</p><p>Users may not copy or download more than 500 verses of the ESV Bible or more than one half of any book of the ESV Bible.</p><a href="https://www.esv.org/" target="_blank" rel="noreferrer">Read at ESV.org</a></div>}
       {!online && <div className="offline-badge"><WifiOff/> Offline — saved app screens remain available</div>}
 
-      {page !== "review" && page !== "reels" && <nav className="mobile-tabs"><button className={page === "home" ? "active" : ""} onClick={() => navigate("home")}><Home />Today</button><button onClick={() => navigate("reels")}><Sparkles />Reels</button><button className={page === "store" ? "active" : ""} onClick={() => navigate("store")}><BookOpen />Store</button><button className={page === "library" ? "active" : ""} onClick={() => navigate("library")}><Library />Library</button><button className={page === "history" ? "active" : ""} onClick={() => navigate("history")}><BarChart3 />Progress</button></nav>}
+      {page !== "review" && page !== "reels" && <nav className="mobile-tabs"><button className={page === "home" ? "active" : ""} onClick={() => navigate("home")}><Home />Today</button><button onClick={() => navigate("reels")}><Sparkles />Reels</button><button className={page === "store" ? "active" : ""} onClick={() => navigate("store")}><BookOpen />Store</button><button className={page === "library" ? "active" : ""} onClick={() => navigate("library")}><Library />Library</button><button className={page === "memory-bank" ? "active" : ""} onClick={() => navigate("memory-bank")}><BookHeart />Memory Bank</button></nav>}
       {toast && <div className="toast"><Check size={17} />{toast}</div>}
     </div>
   );
@@ -234,7 +255,7 @@ function AuthPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }
       const users = await getUsers(); const passwordHash = await hashPassword(password);
       if (mode === "signup") {
         if (name.trim().length < 2) throw new Error("Please enter your name.");
-        if (users.length) throw new Error("This device already has a Selah profile. Sign in to continue.");
+        if (users.length) throw new Error("This device already has a Ruminate profile. Sign in to continue.");
         if (users.some(user => user.email === normalizedEmail)) throw new Error("An account with that email already exists on this device.");
         const user: User = { id: crypto.randomUUID(), name: name.trim(), email: normalizedEmail, passwordHash, createdAt: new Date().toISOString() };
         await saveUser(user); await saveSettings({ userId: user.id, translation: "KJV", dailyGoal: 5, theme: "light", reminders: false }); onAuthenticated(user);
@@ -244,7 +265,7 @@ function AuthPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }
       }
     } catch (err) { setError(err instanceof Error ? err.message : "Authentication failed"); } finally { setBusy(false); }
   }
-  return <main className="auth-page"><section className="auth-story"><div className="brand auth-brand"><span className="brand-mark">S</span><span>Selah<small>scripture memory</small></span></div><div><span className="overline">Keep the Word close</span><blockquote>“Thy word have I hid in mine heart, that I might not sin against thee.”</blockquote><p>Psalm 119:11</p></div></section><section className="auth-form"><div><p className="eyebrow">Welcome to Selah</p><h1>{mode === "signin" ? "Return to your practice." : "Begin your practice."}</h1><p>{mode === "signin" ? "Sign in to continue where you left off." : "Create your secure, synchronized account."}</p><form onSubmit={submit}>{mode === "signup" && <label>Your name<input value={name} onChange={e => setName(e.target.value)} autoComplete="name" required/></label>}<label>Email address<input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required/></label><label>Password<input type="password" minLength={8} value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === "signin" ? "current-password" : "new-password"} required/></label>{error && <p className="auth-error">{error}</p>}<button className="primary" disabled={busy}>{busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}<ArrowRight/></button></form><button className="auth-toggle" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }}>{mode === "signin" ? "New here? Create an account" : "Already have an account? Sign in"}</button><small className="local-note">Your practice is saved to your account.</small></div></section></main>;
+  return <main className="auth-page"><section className="auth-story"><div className="brand auth-brand"><span className="brand-mark">R</span><span>Ruminate<small>scripture memory</small></span></div><div><span className="overline">Keep the Word close</span><blockquote>“Thy word have I hid in mine heart, that I might not sin against thee.”</blockquote><p>Psalm 119:11</p></div></section><section className="auth-form"><div><p className="eyebrow">Welcome to Ruminate</p><h1>{mode === "signin" ? "Return to your practice." : "Begin your practice."}</h1><p>{mode === "signin" ? "Sign in to continue where you left off." : "Create your secure, synchronized account."}</p><form onSubmit={submit}>{mode === "signup" && <label>Your name<input value={name} onChange={e => setName(e.target.value)} autoComplete="name" required/></label>}<label>Email address<input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required/></label><label>Password<input type="password" minLength={8} value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === "signin" ? "current-password" : "new-password"} required/></label>{error && <p className="auth-error">{error}</p>}<button className="primary" disabled={busy}>{busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}<ArrowRight/></button></form><button className="auth-toggle" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }}>{mode === "signin" ? "New here? Create an account" : "Already have an account? Sign in"}</button><small className="local-note">Your practice is saved to your account.</small></div></section></main>;
 }
 
 function shuffle<T>(values: T[]) {
@@ -333,7 +354,7 @@ function ReelsPage({ catalog, library, translation: preferred, onBack, onPin, on
   }
   async function pin(verse: Verse) { try { if (catalog.some(v => v.id === verse.id)) await onPin(verse); else await onImport(verse); } catch (err) { setError(err instanceof Error ? err.message : "Could not pin passage"); } }
   return <div className="reels-page">
-    <div className="reels-toolbar"><button className="exit-reels" onClick={onBack} aria-label="Back to Selah"><ArrowLeft/><span>Back</span></button><div className="reels-title"><span className="overline">Scripture reels</span><h1>{reelMode === "scripture" ? "Pause. Read. Keep." : selectedBook ? `Reading ${selectedBook}` : "The story, book by book."}</h1></div><div className="reels-controls"><div className="reel-mode"><button className={reelMode === "scripture" ? "active" : ""} onClick={() => { setReelMode("scripture"); setSelectedBook(null); }}>Scripture</button><button className={reelMode === "books" ? "active" : ""} onClick={() => setReelMode("books")}>Books</button></div><TranslationSelect compact value={translation} onChange={changeTranslation}/></div></div>
+    <div className="reels-toolbar"><button className="exit-reels" onClick={onBack} aria-label="Back to Ruminate"><ArrowLeft/><span>Back</span></button><div className="reels-title"><span className="overline">Scripture reels</span><h1>{reelMode === "scripture" ? "Pause. Read. Keep." : selectedBook ? `Reading ${selectedBook}` : "The story, book by book."}</h1></div><div className="reels-controls"><div className="reel-mode"><button className={reelMode === "scripture" ? "active" : ""} onClick={() => { setReelMode("scripture"); setSelectedBook(null); }}>Scripture</button><button className={reelMode === "books" ? "active" : ""} onClick={() => setReelMode("books")}>Books</button></div><TranslationSelect compact value={translation} onChange={changeTranslation}/></div></div>
     {error && reelMode === "scripture" && <div className="reel-message">{error}</div>}
     {reelMode === "books" ? selectedBook ? <BookVerseReels book={selectedBook} translation={translation} pinned={pinned} onBack={() => setSelectedBook(null)} onPin={pin}/> : <BookReels onSelect={setSelectedBook}/> : loading && !visibleFeed.length ? <div className="reel-loading"><i/><p>Gathering new {translation} passages…</p></div> : visibleFeed.length ? <div ref={feedRef} className="reel-feed" onScroll={event => { const element = event.currentTarget; activeReel.current = Math.max(0, Math.round(element.scrollTop / element.clientHeight)); if (element.scrollHeight - element.scrollTop - element.clientHeight < element.clientHeight * 4) void loadMore(); }}>{visibleFeed.map((verse, i) => <article className={`reel reel-${i % 4}`} key={`${verse.id}-${i}`}><div className="reel-ornament">{i % 2 ? "✦" : "❧"}</div><div className="reel-content"><span>{verse.topics[0] || "Scripture"}</span><blockquote>“{verse.text}”</blockquote><p>{verse.reference} <i>{verse.translation}</i></p></div><button className={pinned.has(verse.id) ? "pinned" : ""} onClick={() => pin(verse)}><Bookmark/>{pinned.has(verse.id) ? "Pinned" : "Pin to memorize"}</button>{verse.translation === "ESV" && <small>ESV® © 2001 Crossway. Used by permission. <a href="https://www.esv.org/" target="_blank" rel="noreferrer">ESV.org</a></small>}<div className="scroll-cue">Scroll for more <ArrowRight/></div></article>)}</div> : <div className="reel-loading"><BookOpen/><p>{error || "No passages available in this translation."}</p><button className="reel-retry" onClick={() => void loadMore(true)}>Try again</button></div>}
   </div>;
@@ -427,16 +448,16 @@ function BookVerseReels({ book, translation, pinned, onBack, onPin }: { book: st
 
 function SettingsPage({ user, settings, onSave, onSignOut, signingOut }: { user: User; settings: UserSettings; onSave: (value: UserSettings) => void; onSignOut: () => void; signingOut: boolean }) {
   const [draft, setDraft] = useState(settings);
-  return <div className="page settings-page"><section className="page-title"><p className="eyebrow">Your Selah</p><h1>Settings</h1><p>Shape a practice that fits your life.</p></section><div className="settings-layout"><aside><div className="settings-avatar">{user.name.split(" ").map(p => p[0]).join("").slice(0,2)}</div><h2>{user.name}</h2><p>{user.email}</p><span><UserRound/> PostgreSQL account</span></aside><section className="settings-panel"><div><span className="overline">Scripture</span><h2>Reading preferences</h2><TranslationSelect value={draft.translation} onChange={translation => setDraft({ ...draft, translation })}/><small>This preference is the default everywhere Scripture is shown. You can still switch versions while reading.</small></div><div><span className="overline">Practice</span><h2>Daily rhythm</h2><label>Daily verse goal<input type="number" min="1" max="50" value={draft.dailyGoal} onChange={e => setDraft({ ...draft, dailyGoal: Number(e.target.value) })}/></label><label className="toggle-line"><span>Daily reminders<small>{isNativeApp ? "A push reminder at 9 a.m. when a verse is due." : "Managed in the Android and iOS app."}</small></span><input type="checkbox" disabled={!isNativeApp} checked={draft.reminders} onChange={e => setDraft({ ...draft, reminders: e.target.checked })}/></label></div>{!isNativeApp && <div><span className="overline">Mobile app</span><h2>Install Selah</h2><p className="install-copy">Add Selah to your home screen for a full-screen, app-like experience.</p><InstallAppButton/></div>}<button className="primary" onClick={() => onSave(draft)}>Save preferences <Check/></button></section></div><button className="signout" disabled={signingOut} onClick={onSignOut}><LogOut/> {signingOut ? "Signing out…" : "Sign out on this device"}</button></div>;
+  return <div className="page settings-page"><section className="page-title"><p className="eyebrow">Your Ruminate</p><h1>Settings</h1><p>Shape a practice that fits your life.</p></section><div className="settings-layout"><aside><div className="settings-avatar">{user.name.split(" ").map(p => p[0]).join("").slice(0,2)}</div><h2>{user.name}</h2><p>{user.email}</p><span><UserRound/> PostgreSQL account</span></aside><section className="settings-panel"><div><span className="overline">Scripture</span><h2>Reading preferences</h2><TranslationSelect value={draft.translation} onChange={translation => setDraft({ ...draft, translation })}/><small>This preference is the default everywhere Scripture is shown. You can still switch versions while reading.</small></div><div><span className="overline">Practice</span><h2>Daily rhythm</h2><label>Daily verse goal<input type="number" min="1" max="50" value={draft.dailyGoal} onChange={e => setDraft({ ...draft, dailyGoal: Number(e.target.value) })}/></label><label className="toggle-line"><span>Daily reminders<small>{isNativeApp ? "A push reminder at 9 a.m. when a verse is due." : "Managed in the Android and iOS app."}</small></span><input type="checkbox" disabled={!isNativeApp} checked={draft.reminders} onChange={e => setDraft({ ...draft, reminders: e.target.checked })}/></label></div>{!isNativeApp && <div><span className="overline">Mobile app</span><h2>Install Ruminate</h2><p className="install-copy">Add Ruminate to your home screen for a full-screen, app-like experience.</p><InstallAppButton/></div>}<button className="primary" onClick={() => onSave(draft)}>Save preferences <Check/></button></section></div><button className="signout" disabled={signingOut} onClick={onSignOut}><LogOut/> {signingOut ? "Signing out…" : "Sign out on this device"}</button></div>;
 }
 
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
 function InstallAppButton() {
   const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null); const [installed, setInstalled] = useState(window.matchMedia("(display-mode: standalone)").matches);
   useEffect(() => { const ready = (event: Event) => { event.preventDefault(); setPrompt(event as InstallPromptEvent); }; const done = () => setInstalled(true); window.addEventListener("beforeinstallprompt", ready); window.addEventListener("appinstalled", done); return () => { window.removeEventListener("beforeinstallprompt", ready); window.removeEventListener("appinstalled", done); }; }, []);
-  if (installed) return <div className="installed-state"><Check/> Selah is installed on this device</div>;
+  if (installed) return <div className="installed-state"><Check/> Ruminate is installed on this device</div>;
   if (!prompt) return <div className="install-help"><Download/> On iPhone, tap Share → Add to Home Screen. On Android, open the browser menu → Install app.</div>;
-  return <button className="install-button" onClick={async () => { await prompt.prompt(); const choice = await prompt.userChoice; if (choice.outcome === "accepted") setInstalled(true); setPrompt(null); }}><Download/> Install Selah</button>;
+  return <button className="install-button" onClick={async () => { await prompt.prompt(); const choice = await prompt.userChoice; if (choice.outcome === "accepted") setInstalled(true); setPrompt(null); }}><Download/> Install Ruminate</button>;
 }
 
 function HomePage({ due, streak, library, verseFor, onReview, onStore }: { due: number; streak: number; library: LibraryItem[]; verseFor: (id: string) => Verse; onReview: () => void; onStore: () => void }) {
@@ -456,7 +477,7 @@ function StorePage({ filtered, topics, topic, query, library, preferredTranslati
   const [communityTags, setCommunityTags] = useState<Record<string, { tag: string; uses: number }[]>>({});
   const [preview, setPreview] = useState<{ title: string; description: string; curator: string; verseIds: string[] } | null>(null);
   useEffect(() => { apiCollections().then(setCommunity).catch(() => setCommunity([])); apiCommunityTags().then(setCommunityTags).catch(() => setCommunityTags({})); }, []);
-  const openCurated = (pack: typeof packs[number]) => setPreview({ title: pack.name, description: pack.description, curator: "Curated by Selah", verseIds: verses.filter(v => v.pack === pack.name).map(v => v.id) });
+  const openCurated = (pack: typeof packs[number]) => setPreview({ title: pack.name, description: pack.description, curator: "Curated by Ruminate", verseIds: verses.filter(v => v.pack === pack.name).map(v => v.id) });
   return <div className="page store-page">
     <section className="page-title"><p className="eyebrow">Discover & collect</p><h1>Verse Store</h1><p>Find words for every season and make them your own.</p></section>
     <BibleBrowser preferredTranslation={preferredTranslation} onImport={onImport}/>
@@ -495,7 +516,7 @@ function LibraryPage({ library, verseFor, onRemove, onUpdate, onReview, onStore 
     <div className="library-stats"><div><BookHeart/><strong>{library.length}</strong><span>Verses saved</span></div><div><Layers3/><strong>{collections.length}</strong><span>Collections</span></div><div><Flame/><strong>{library.reduce((sum, i) => sum + i.reviews, 0)}</strong><span>Reviews</span></div></div>
     <div className="library-toolbar"><div><span className="overline">All verses</span><h2>Growing in your heart</h2></div><button className="primary small" onClick={onReview}>Practice now <ArrowRight/></button></div>
     {personalTags.length > 0 && <div className="personal-tag-filter"><span>Filter by tag</span><button className={tagFilter === "All" ? "active" : ""} onClick={() => setTagFilter("All")}>All</button>{personalTags.map(tag => <button className={tagFilter === tag ? "active" : ""} onClick={() => setTagFilter(tag)} key={tag}>#{tag}</button>)}</div>}
-    {library.length ? <div className="library-list">{shown.map(item => { const v = verseFor(item.verseId); return <article key={v.id}><div className="book-tile">{v.book.slice(0, 2).toUpperCase()}</div><div className="library-copy"><span>{item.collection}</span><h3>{v.reference} <i>{v.translation}</i></h3><p>{v.text}</p><TagEditor item={item} onUpdate={onUpdate}/><div className="mastery"><span style={{ width: `${Math.min(100, item.stage * 18)}%` }}/></div><small>Stage {item.stage} · {item.reviews} reviews</small></div><button className="icon-button" title="Remove verse" onClick={() => onRemove(v)}><X/></button></article> })}</div> : <div className="empty"><BookOpen/><h2>Your library is waiting</h2><p>Choose a few passages to begin your practice.</p><button className="primary" onClick={onStore}>Explore Verse Store</button></div>}
+    {library.length ? <div className="library-list">{shown.map(item => { const v = verseFor(item.verseId); return <article key={v.id}><div className="book-tile">{v.book.slice(0, 2).toUpperCase()}</div><div className="library-copy"><span>{item.collection}</span><h3>{v.reference} <i>{v.translation}</i></h3><p>{v.text}</p><TagEditor item={item} onUpdate={onUpdate}/><div className="mastery"><span style={{ width: `${Math.min(100, item.stage * 18)}%` }}/></div><small>Stage {item.stage} · {item.reviews} reviews</small><button className="memorized-toggle" aria-pressed={isMemorized(item)} onClick={() => void Promise.resolve(onUpdate({ ...item, memorized: !isMemorized(item) })).catch(() => {})}>{isMemorized(item) ? "✓ Memorized · move back to learning" : "Mark as memorized"}</button></div><button className="icon-button" title="Remove verse" onClick={() => onRemove(v)}><X/></button></article> })}</div> : <div className="empty"><BookOpen/><h2>Your library is waiting</h2><p>Choose a few passages to begin your practice.</p><button className="primary" onClick={onStore}>Explore Verse Store</button></div>}
   </div>;
 }
 
@@ -518,9 +539,9 @@ function cleanWord(word: string) {
   return word.toLowerCase().replace(/[^a-z0-9']/g, "");
 }
 
-function ReviewPage({ items, index, verse, onRate, onClose }: { items: LibraryItem[]; index: number; verse?: Verse; onRate: (r: ReviewRating, summary: ExerciseSummary) => void; onClose: () => void }) {
+function ReviewPage({ items, index, verse, onRate, onClose, initialMode = "easy" }: { items: LibraryItem[]; index: number; verse?: Verse; onRate: (r: ReviewRating, summary: ExerciseSummary) => void; onClose: () => void; initialMode?: ReviewResult["mode"] }) {
   type PracticeMode = ReviewResult["mode"];
-  const [mode, setMode] = useState<PracticeMode>("easy");
+  const [mode, setMode] = useState<PracticeMode>(initialMode);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [fullRecall, setFullRecall] = useState("");
   const [activeBlank, setActiveBlank] = useState<number | null>(null);

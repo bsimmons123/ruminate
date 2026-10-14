@@ -5,7 +5,7 @@ const result = spawnSync(command, ["run", "mobile:sync"], {
   env: {
     ...process.env,
     VITE_API_BASE_URL: "https://selah.simmonsweb.com",
-    SELAH_MOBILE_DEV_HTTP: "false",
+    RUMINATE_MOBILE_DEV_HTTP: "false",
   },
   stdio: "inherit",
 });

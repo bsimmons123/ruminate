@@ -82,6 +82,34 @@ h1,h2,h3,blockquote { font-family:"Gilda Display",serif; font-weight:400; }
 }
 
 .reel-retry{border:1px solid #d7bd91;background:transparent;color:white;padding:10px 18px;margin:6px auto;cursor:pointer}
+.memorized-toggle{display:block;margin-top:12px;border:1px solid var(--line);border-radius:4px;background:transparent;padding:8px 12px;color:var(--forest);cursor:pointer;font-size:12px}
+.memorized-toggle[aria-pressed="true"]{background:#e3e9e3}
+@media(min-width:801px) and (max-width:1100px){
+  header{height:70px;padding:0 24px}
+  .brand{flex-shrink:0}
+  .streak,.avatar{display:none}
+  .menu{display:block}
+  header>nav{display:none;position:absolute;top:70px;left:0;right:0;height:auto;background:var(--paper);padding:20px;flex-direction:column;gap:5px;border-bottom:1px solid var(--line)}
+  header>nav.open{display:flex;max-height:calc(100dvh - 70px);overflow-y:auto}
+  header nav button{padding:12px;text-align:left}
+  header nav button.active:after{display:none}
+  header nav .mobile-account{display:flex;flex-direction:column;gap:4px;padding:12px;border-bottom:1px solid var(--line)}
+  header nav .mobile-signout{display:flex;gap:10px;align-items:center;color:#985849}
+}
+.memory-bank-quiz{display:flex;align-items:center;justify-content:space-between;gap:28px;background:#e5eadd;border:1px solid var(--line);padding:30px;margin-bottom:28px}
+.memory-bank-quiz h2{font-size:30px;margin:8px 0}
+.memory-bank-quiz p{max-width:550px;color:#65766d;line-height:1.6;font-size:14px}
+.memory-bank-quiz .primary{flex-shrink:0}
+@media(max-width:1100px){.memory-bank-quiz{flex-direction:column;align-items:stretch}}
+.memory-bank-search{display:flex;gap:12px;align-items:center;border:1px solid var(--line);background:var(--paper);padding:12px 16px;margin-bottom:24px}
+.memory-bank-search input{width:100%;border:0;background:transparent;padding:6px;color:var(--ink)}
+.memory-bank-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.memory-bank-grid article{padding:28px;background:var(--paper);border:1px solid var(--line)}
+.memory-bank-grid h2{font-size:27px;margin:10px 0}
+.memory-bank-grid p{font:19px/1.65 "Gilda Display";overflow-wrap:anywhere}
+.memory-bank-grid article>div{display:flex;gap:16px;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:18px}
+.memory-bank-resume{border:0;background:transparent;color:#65766d;font-size:11px;text-decoration:underline;cursor:pointer}
+@media(max-width:800px){.memory-bank-quiz{flex-direction:column;align-items:stretch;padding:24px}.memory-bank-grid{grid-template-columns:1fr}.memory-bank-grid article>div{flex-wrap:wrap}.memory-bank-grid article{padding:24px}}
 @media(max-width:800px){
   .reels-page{height:100dvh;min-height:0;display:flex;flex-direction:column}
   .reels-toolbar{flex:none}

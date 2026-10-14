@@ -1,3 +1,4 @@
+name: selah # Stable deployment identity preserves existing database volumes.
 services:
   db:
     image: postgres:17-alpine

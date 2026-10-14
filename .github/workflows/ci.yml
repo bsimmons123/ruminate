@@ -44,4 +44,4 @@ jobs:
         run: docker compose config --quiet
 
       - name: Build container image
-        run: docker build --tag selah:ci .
+        run: docker build --tag ruminate:ci .

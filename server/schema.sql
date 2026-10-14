@@ -54,6 +54,8 @@ create table if not exists community_collections (
 
 insert into community_collections(id,title,description,curator,category,verse_ids,featured) values
   ('community-anxious-heart','For the Anxious Heart','Promises to return to when your thoughts feel heavy.','Grace Community','Peace','["php-4-6-7","ps-46-10","matt-11-28","isa-41-10"]',true),
-  ('community-first-verses','First Verses to Memorize','A welcoming starting point for building a Scripture-memory rhythm.','Selah Community','Foundations','["john-3-16","prov-3-5-6","ps-119-11","heb-11-1"]',true),
+  ('community-first-verses','First Verses to Memorize','A welcoming starting point for building a Scripture-memory rhythm.','Ruminate Community','Foundations','["john-3-16","prov-3-5-6","ps-119-11","heb-11-1"]',true),
   ('community-courage','Courage for the Week','Words of courage, trust, and purpose for uncertain days.','The Way Fellowship','Courage','["josh-1-9","isa-41-10","rom-8-28","prov-3-5-6"]',false)
 on conflict (id) do nothing;
+
+update community_collections set curator='Ruminate Community' where id='community-first-verses' and curator='Selah Community';

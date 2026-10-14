@@ -31,7 +31,7 @@ async function sendApns(deviceToken) {
   const host = process.env.APNS_SANDBOX === "true" ? "https://api.sandbox.push.apple.com" : "https://api.push.apple.com";
   const client = http2.connect(host);
   try {
-    const body = JSON.stringify({ aps: { alert: { title: "Time for Selah", body: "A Scripture verse is ready for review." }, sound: "default" }, page: "review" });
+    const body = JSON.stringify({ aps: { alert: { title: "Time for Ruminate", body: "A Scripture verse is ready for review." }, sound: "default" }, page: "review" });
     const response = client.request({ ":method": "POST", ":path": `/3/device/${deviceToken}`, authorization: `bearer ${token}`, "apns-topic": process.env.APNS_BUNDLE_ID, "apns-push-type": "alert", "content-type": "application/json" });
     response.setEncoding("utf8");
     response.end(body);
@@ -43,7 +43,7 @@ export async function sendReminder(device) {
   if (device.platform === "ios") return sendApns(device.token);
   const messaging = firebaseMessaging();
   if (!messaging) return false;
-  await messaging.send({ token: device.token, notification: { title: "Time for Selah", body: "A Scripture verse is ready for review." }, data: { page: "review" }, android: { priority: "high" } });
+  await messaging.send({ token: device.token, notification: { title: "Time for Ruminate", body: "A Scripture verse is ready for review." }, data: { page: "review" }, android: { priority: "high" } });
   return true;
 }
 

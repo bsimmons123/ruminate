@@ -1,6 +1,6 @@
 {
-  "name": "Selah Scripture Memory",
-  "short_name": "Selah",
+  "name": "Ruminate Scripture Memory",
+  "short_name": "Ruminate",
   "description": "Keep Scripture close through discovery, recall, and spaced repetition.",
   "start_url": "/",
   "scope": "/",
@@ -10,7 +10,7 @@
   "theme_color": "#24493c",
   "categories": ["education", "lifestyle"],
   "icons": [
-    { "src": "/icons/selah.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/icons/selah-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    { "src": "/icons/ruminate.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/ruminate-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
   ]
 }

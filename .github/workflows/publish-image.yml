@@ -35,7 +35,7 @@ jobs:
         id: metadata
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/selah
+          images: ghcr.io/${{ github.repository_owner }}/ruminate
           tags: |
             type=raw,value=latest
             type=sha,prefix=sha-

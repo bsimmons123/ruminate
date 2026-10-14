@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Selah</string>
-    <string name="title_activity_main">Selah</string>
+    <string name="app_name">Ruminate</string>
+    <string name="title_activity_main">Ruminate</string>
     <string name="package_name">com.selah.scripturememory</string>
     <string name="custom_url_scheme">com.selah.scripturememory</string>
 </resources>
