@@ -5,3 +5,7 @@ dist/
 *.log
 *.tsbuildinfo
 .DS_Store
+android/app/google-services.json
+.signing/
+*.p8
+*service-account*.json

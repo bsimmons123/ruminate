@@ -19,6 +19,16 @@ create table if not exists user_data (
 
 create index if not exists user_data_owner_kind on user_data(user_id, kind);
 
+create table if not exists push_devices (
+  token text primary key,
+  user_id uuid not null references users(id) on delete cascade,
+  platform text not null check (platform in ('android', 'ios')),
+  timezone text not null,
+  last_sent_local_date date,
+  updated_at timestamptz not null default now()
+);
+create index if not exists push_devices_user on push_devices(user_id);
+
 create table if not exists esv_requests (
   id bigserial primary key,
   requested_at timestamptz not null default now()

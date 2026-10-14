@@ -35,6 +35,8 @@
   height: 100%; min-height: 100%; scroll-snap-align: start; scroll-snap-stop: always;
 }
 .reels-page .verse-reels-shell { overflow: hidden; }
+.reels-page .back-to-books { position: absolute; top: 16px; left: 20px; margin: 0; }
+.reels-page .reel-spacer { flex: none; scroll-snap-align: none; }
 .reels-page .empty { height: 100%; display: grid; place-content: center; color: white; }
 .reels-page .reel-message { position: absolute; top: 96px; left: 0; right: 0; z-index: 15; }
 
@@ -60,4 +62,9 @@
   .reels-controls { gap: 5px; }
   .reels-toolbar select { max-width: 74px; }
   .reels-page .reel blockquote { font-size: clamp(25px, 7.5vw, 34px); }
+}
+
+@media (max-width: 800px) {
+  .mobile-tabs { height: calc(68px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); }
+  .page { padding-bottom: calc(95px + env(safe-area-inset-bottom)); }
 }

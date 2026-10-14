@@ -38,6 +38,60 @@ npm run build
 npm run preview
 ```
 
+## Native Android and iOS app
+
+Selah includes Capacitor projects in `android/` and `ios/`. The native app packages the same memorization, review, library, progress, settings, and Scripture Reels screens as the web app. It uses the existing API with a bearer session and receives native push reminders for verses due for review.
+
+Keep the API running locally with Docker Compose, or run PostgreSQL and `npm run dev:api` yourself. Set `VITE_API_BASE_URL` to the API address visible to the device **before** building the mobile app. Android emulators can use `http://10.0.2.2:3001`; iOS simulators can use `http://localhost:3001`. A physical Android device can use `http://localhost:3001` over a USB `adb reverse` tunnel; testing over Wi-Fi needs a reachable address and trusted HTTPS certificate. The web client continues to use same-origin `/api` when this variable is unset.
+
+```bash
+# Android emulator, local development only
+VITE_API_BASE_URL=http://10.0.2.2:3001 SELAH_MOBILE_DEV_HTTP=true npm run mobile:android
+
+# iOS simulator (requires macOS and Xcode)
+VITE_API_BASE_URL=http://localhost:3001 npm run mobile:ios
+```
+
+`mobile:android` and `mobile:ios` build, sync, and open the platform project. `SELAH_MOBILE_DEV_HTTP=true` enables Android mixed content only for local testing; leave it unset for release builds. A release build should use a reachable HTTPS API. Android Studio and the Android SDK are required to compile Android; Xcode and Apple signing are required to compile iOS. The generated native projects have Selah icons and splash screens from `assets/logo.svg`.
+
+For a production-targeted mobile build, run `npm run mobile:sync:prod`. This packages `https://selah.simmonsweb.com` as the API base URL for both platforms. Build the native project after syncing; for an installable Android test APK, run `cd android && ./gradlew assembleDebug`. This command only creates a local artifact. The production backend must include the native bearer-session, device-registration, Bible-book, and CORS routes from this version before that APK can sign in. Android store distribution additionally requires release signing.
+
+Pushes to `master` in `bsimmons123/selah` run `.github/workflows/publish-android.yml`, which builds a signed production-targeted APK and attaches it with a SHA-256 checksum to a GitHub Release named for the commit. The workflow needs four repository secrets: `ANDROID_KEYSTORE_BASE64` (base64 of the Android signing keystore), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Keep the original keystore and passwords backed up securely; future APKs must use the same key to update an installed app. A `workflow_dispatch` run can retry publishing after the backend is updated.
+
+### Native push reminders
+
+- Android: add your Firebase project's `google-services.json` at `android/app/google-services.json` (ignored by Git). Give the API a Firebase service account through `FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS`.
+- iOS: enable Push Notifications for the `com.selah.scripturememory` App ID and sign the Xcode project. Set `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`, and `APNS_BUNDLE_ID` on the API. Set `APNS_SANDBOX=true` for development builds and `false` for production builds.
+- In the native app, sign in and enable **Daily reminders** in Settings. The device registers its token and time zone with Selah. The API checks once per minute and sends one reminder at 9 a.m. local time when a verse is due. Turning reminders off or signing out removes that device's token. Push requires a real configured device and provider credentials; the iOS simulator cannot receive APNs push.
+
+Keep Firebase and Apple keys outside source control. The browser and PWA show the reminder toggle as unavailable because this implementation uses native push.
+
+The native projects and backend remain local until you choose a reachable API endpoint. No publishing step is part of this workflow.
+
+### Test on a Pixel over USB
+
+Install Android Studio and its SDK Platform Tools, then enable **Developer options → USB debugging** on the Pixel and accept the computer authorization prompt. From the Selah directory:
+
+```bash
+npm ci
+cp .env.example .env  # edit POSTGRES_PASSWORD and JWT_SECRET
+docker compose up --build -d
+adb devices            # confirm the Pixel is listed as "device"
+adb reverse tcp:3001 tcp:3001
+VITE_API_BASE_URL=http://localhost:3001 SELAH_MOBILE_DEV_HTTP=true npm run mobile:sync
+SELAH_MOBILE_DEV_HTTP=true npx cap run android --no-sync  # select the Pixel
+```
+
+The API stays on your computer and the app runs on the phone. Keep the USB cable connected while testing; after reconnecting, repeat `adb reverse tcp:3001 tcp:3001`. Sign up in the app, pin a verse from Reels, complete a review, and reopen the app to verify that the library and progress load from PostgreSQL.
+
+For Android push, add `android/app/google-services.json` from your Firebase project before building the app, and set `FIREBASE_SERVICE_ACCOUNT_JSON` for the API. After signing in and enabling Daily reminders on the Pixel, send an immediate test notification from the local container:
+
+```bash
+docker compose exec app npm run push:test -- your-email@example.com
+```
+
+The daily scheduler still sends only at 9 a.m. local time when a verse is due. The one-off command tests the same Android delivery path immediately, without changing the reminder schedule.
+
 ## Run the complete stack
 
 Copy the environment template and choose strong secrets:

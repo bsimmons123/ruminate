@@ -9,13 +9,24 @@
     "dev:api": "node --watch server/index.js",
     "start": "node server/index.js",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "mobile:sync": "node scripts/check-mobile-config.mjs && npm run build && cap sync",
+    "mobile:sync:prod": "node scripts/sync-mobile-production.mjs",
+    "mobile:android": "npm run mobile:sync && cap open android",
+    "mobile:ios": "npm run mobile:sync && cap open ios",
+    "push:test": "node scripts/send-test-push.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
+    "@capacitor/push-notifications": "^8.1.3",
     "@vitejs/plugin-react": "latest",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
+    "firebase-admin": "^14.5.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "latest",
     "pg": "^8.16.3",
@@ -24,6 +35,7 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "typescript": "latest"

@@ -23,7 +23,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -33,7 +33,12 @@ jobs:
         run: npm run build
 
       - name: Validate API syntax
-        run: node --check server/index.js
+        run: |
+          node --check server/index.js
+          node --check server/reminders.js
+
+      - name: Sync native projects
+        run: npx cap sync
 
       - name: Validate Docker Compose
         run: docker compose config --quiet
