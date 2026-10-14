@@ -7,7 +7,10 @@ const config: CapacitorConfig = {
   android: { allowMixedContent: (process.env.RUMINATE_MOBILE_DEV_HTTP || process.env.SELAH_MOBILE_DEV_HTTP) === "true" },
   server: { cleartext: (process.env.RUMINATE_MOBILE_DEV_HTTP || process.env.SELAH_MOBILE_DEV_HTTP) === "true" },
   plugins: {
-    PushNotifications: { presentationOptions: ["badge", "sound", "alert"] }
+    PushNotifications: { presentationOptions: ["badge", "sound", "alert"] },
+    // Resize the webview so focused fields lift above the keyboard instead of
+    // being covered by it.
+    Keyboard: { resize: "native", resizeOnFullScreen: true }
   }
 };
 

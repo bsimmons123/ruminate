@@ -1,0 +1,609 @@
+/* Native app layer.
+   Every rule here is scoped under .native, which main.tsx sets on <html> only when
+   running inside Capacitor. The web and PWA render exactly as they do without this file.
+   .native.ios narrows to iOS where a rule is genuinely platform-specific. */
+
+/* ---------- Tokens ---------- */
+
+.native {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --tab-height: 56px;
+  --tab-total: calc(var(--tab-height) + var(--safe-bottom));
+  --nav-height: 52px;
+  --touch: 44px;
+
+  /* Explicit stacking order. The tab bar has to clear .reels-page, which is
+     position:fixed at z-index 100 (reels.css:3); sheets cover the tab bar; transient
+     notices cover everything. */
+  --z-bar: 30;
+  --z-tray: 40;
+  --z-tabs: 110;
+  --z-sheet: 200;
+  --z-notice: 220;
+}
+
+/* ---------- Shell ---------- */
+
+.native,
+.native body {
+  height: 100%;
+  overscroll-behavior-y: none;
+}
+
+.native body { overflow: hidden; }
+
+/* The shell is the scroll container so the document itself never bounces and drags
+   the fixed header and tab bar with it. */
+.native .app-shell {
+  height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* 100vh resolves to the large viewport in a webview and overshoots. */
+.native .loading,
+.native .auth-page { min-height: 0; height: 100dvh; }
+.native .review-page { min-height: 0; }
+
+/* .esv-global follows .page in the scroller and carries the tab-bar clearance, so the
+   page itself must not also reserve it. */
+.native .page {
+  padding: 26px max(18px, var(--safe-left)) 28px max(18px, var(--safe-right));
+}
+
+.native .esv-global { padding-bottom: calc(20px + var(--tab-total)); }
+
+/* Review hides the tab bar, so neither the page nor the notice reserves room for one. */
+.native .app-shell:has(.review-page) .esv-global { padding-bottom: calc(20px + var(--safe-bottom)); }
+
+/* styles.css sizes main against an 84px header that native does not render. */
+.native main { min-height: 0; }
+
+/* The startup-error screen renders outside the shell, and body scrolling is locked,
+   so it has to be its own scroll container or a long message is unreachable. */
+.native #root > .empty {
+  height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(60px + var(--safe-top)) max(20px, var(--safe-left)) calc(40px + var(--safe-bottom)) max(20px, var(--safe-right));
+}
+
+.native .offline-badge { bottom: calc(14px + var(--tab-total)); z-index: var(--z-notice); }
+.native .toast { bottom: calc(14px + var(--tab-total)); z-index: var(--z-notice); }
+
+/* ---------- Navigation shell ---------- */
+
+.native .native-shell { height: 100dvh; }
+
+/* Title bar is transparent over the page's own large title and fades in a compact
+   title once that heading has scrolled away. */
+.native .native-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: var(--z-bar);
+  height: calc(var(--nav-height) + var(--safe-top));
+  padding-top: var(--safe-top);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: rgba(246,243,236,0);
+  border-bottom: 1px solid transparent;
+  transition: background .2s ease, border-color .2s ease;
+}
+.native .native-bar.collapsed {
+  background: rgba(246,243,236,.82);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom-color: var(--line);
+}
+.native .native-bar-title {
+  font: 600 16px "DM Sans", sans-serif;
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.native .native-bar.collapsed .native-bar-title { opacity: 1; transform: none; }
+
+/* The shell supplies the bar, so the web header is gone and main needs no inset
+   beyond the status bar. */
+.native main { padding-top: var(--safe-top); }
+.native .reels-page { padding-top: 0; }
+
+.native .native-tabs {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: var(--z-tabs);
+  height: var(--tab-total);
+  padding-bottom: var(--safe-bottom);
+  display: flex;
+  justify-content: space-around;
+  background: rgba(255,253,248,.88);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-top: 1px solid var(--line);
+}
+.native .native-tabs button {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 2px;
+  color: #7b8781;
+  cursor: pointer;
+}
+.native .native-tabs button span {
+  font-size: 10px;
+  line-height: 1.1;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.native .native-tabs button.active { color: #8e5a47; }
+.native .native-tabs button:active { opacity: .55; }
+
+/* ---------- Sheets ---------- */
+
+.native .sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sheet);
+  background: rgba(21,35,29,.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: flex-end;
+  animation: sheetFade .2s ease;
+}
+@keyframes sheetFade { from { opacity: 0 } }
+
+.native .sheet {
+  position: relative;
+  width: 100%;
+  max-height: 90dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  background: var(--paper);
+  border-radius: 18px 18px 0 0;
+  padding: 10px max(20px, var(--safe-left)) calc(20px + var(--safe-bottom)) max(20px, var(--safe-right));
+  box-shadow: 0 -12px 40px rgba(20,32,27,.22);
+  animation: sheetUp .26s cubic-bezier(.32,.72,0,1);
+}
+@keyframes sheetUp { from { transform: translateY(100%) } }
+
+.native .sheet-grip {
+  display: block;
+  width: 38px;
+  height: 4px;
+  border-radius: 2px;
+  background: #d4d0c5;
+  margin: 2px auto 14px;
+}
+
+.native .sheet-close {
+  position: absolute;
+  top: 12px; right: 14px;
+  width: var(--touch);
+  height: var(--touch);
+  border: 0;
+  border-radius: 50%;
+  background: #eeebe3;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.native .sheet-account { padding: 4px 4px 16px; }
+.native .sheet-account strong { display: block; font: 400 22px "Gilda Display", serif; }
+.native .sheet-account span { font-size: 13px; color: #66736d; overflow-wrap: anywhere; }
+
+/* Grouped inset list, the iOS convention for a menu like this. */
+.native .sheet-list {
+  background: #f4f1e8;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.native .sheet-list button {
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 0 16px;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+}
+.native .sheet-list button:last-child { border-bottom: 0; }
+.native .sheet-list button:active { background: #eae6da; }
+.native .sheet-list svg { color: #7a8c80; flex: none; }
+
+.native .sheet-signout {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #f6e7e3;
+  color: #985849;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.native .sheet-signout:active { background: #efdcd7; }
+.native .sheet-signout:disabled { opacity: .6; }
+
+/* The collection preview becomes a sheet rather than a centered desktop dialog. */
+.native .collection-overlay {
+  display: flex;
+  align-items: flex-end;
+  padding: 0;
+  background: rgba(21,35,29,.5);
+  z-index: var(--z-sheet);
+}
+.native .collection-preview {
+  width: 100%;
+  max-height: 90dvh;
+  border-radius: 18px 18px 0 0;
+  padding: 26px max(20px, var(--safe-left)) calc(20px + var(--safe-bottom)) max(20px, var(--safe-right));
+  animation: sheetUp .26s cubic-bezier(.32,.72,0,1);
+}
+.native .collection-preview > h2 { font-size: 29px; }
+.native .preview-actions {
+  padding-bottom: calc(6px + var(--safe-bottom));
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.native .preview-actions .primary { width: 100%; min-height: var(--touch); }
+
+/* ---------- Touch behavior ---------- */
+
+.native * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.native button,
+.native [role="button"] {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* Text stays selectable where selecting it is the point. */
+.native blockquote,
+.native .verse-main p,
+.native .recall-card > p,
+.native .passage-exercise {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Hover states never un-stick on touch; :active is the honest equivalent. */
+.native .primary:hover { background: #d9a56b; }
+.native .primary:active { background: #c8924f; transform: scale(.985); }
+.native .word-blank:hover { background: #eee9df; }
+.native .choice-tray button:hover,
+.native .choice-tray button:focus { border-color: #c9c0b2; background: var(--paper); transform: none; box-shadow: none; }
+.native .choice-tray button:active { border-color: #9b6750; background: #fff; transform: scale(.97); }
+.native .open-book:hover { background: rgba(24,42,35,.25); color: white; border-color: rgba(255,255,255,.5); }
+.native .open-book:active { background: #e0bd86; color: #263f36; border-color: #e0bd86; }
+.native .ratings button:hover { border-color: transparent; }
+.native .ratings button:active { border-color: #9c7b64; background: #ebe5d9; }
+
+/* ---------- Touch targets ---------- */
+
+.native .icon-button {
+  min-width: var(--touch);
+  min-height: var(--touch);
+  display: grid;
+  place-items: center;
+  opacity: .75;
+}
+.native .icon-button svg { width: 20px; height: 20px; }
+.native .icon-button:active { opacity: 1; }
+
+.native .text-button,
+.native .memory-bank-resume,
+.native .auth-toggle,
+.native .signout {
+  min-height: var(--touch);
+  display: inline-flex;
+  align-items: center;
+}
+
+.native .modal-close {
+  width: var(--touch);
+  height: var(--touch);
+  border-radius: 50%;
+}
+
+.native .topic-row button,
+.native .personal-tag-filter button {
+  min-height: 38px;
+  padding-inline: 16px;
+}
+
+/* ---------- Forms ---------- */
+
+/* iOS zooms any focused field below 16px. The viewport lock in main.tsx prevents the
+   zoom, but the field is still rendered at an uncomfortable size without this. */
+.native input,
+.native select,
+.native textarea {
+  font-size: 16px;
+}
+
+.native .auth-form input,
+.native .settings-panel input,
+.native .settings-panel select {
+  height: 52px;
+  border-radius: 10px;
+  padding: 0 14px;
+  -webkit-appearance: none;
+  appearance: none;
+  /* iOS styles an unreset select as blue system text. */
+  color: var(--ink);
+}
+
+/* Chevron, since appearance:none removes the native one. */
+.native .settings-panel select {
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%23697a71' stroke-width='1.8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+
+.native .search { height: 56px; border-radius: 12px; }
+.native .search kbd { display: none; }
+
+/* ---------- Scrolling ---------- */
+
+.native .page,
+.native .reel-feed,
+.native .verse-book-feed,
+.native .collection-preview,
+.native .topic-row,
+.native .personal-tag-filter {
+  -webkit-overflow-scrolling: touch;
+}
+
+.native .reel-feed,
+.native .verse-book-feed {
+  overscroll-behavior-y: contain;
+}
+
+.native .reel-feed .reel,
+.native .verse-book-feed .book-verse {
+  scroll-snap-stop: always;
+}
+
+/* ---------- Auth ---------- */
+
+/* main already insets by the status bar, so auth-form adds spacing only. */
+.native .auth-page { display: block; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.native .auth-form {
+  display: block;
+  padding: 40px max(22px, var(--safe-left)) calc(28px + var(--safe-bottom)) max(22px, var(--safe-right));
+}
+.native .auth-form h1 { font-size: 36px; }
+.native .auth-form form { gap: 15px; }
+.native .auth-form .primary { min-height: 52px; border-radius: 10px; font-size: 16px; }
+.native .auth-error { border-radius: 8px; font-size: 13px; padding: 12px; }
+.native .local-note { font-size: 11px; }
+
+/* ---------- Home ---------- */
+
+.native .review-card {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 30px 24px 26px;
+  border-radius: 14px;
+  min-height: 0;
+}
+.native .review-card .primary { width: 100%; min-height: 52px; border-radius: 10px; }
+
+/* The ring was absolutely positioned at 45% opacity behind the copy, which read as a
+   rendering fault. A stat row states the same thing legibly. */
+.native .progress-ring { display: none; }
+.native .review-stats {
+  display: flex;
+  gap: 22px;
+  margin: 0 0 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255,255,255,.18);
+}
+.native .review-stats div { display: flex; flex-direction: column; gap: 2px; }
+.native .review-stats strong { font: 400 26px "Gilda Display", serif; color: #fff; }
+.native .review-stats span { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #bdc9c2; }
+
+/* Glanceable instead of three stacked blocks. */
+.native .verse-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 78%;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  border: 0;
+  padding-bottom: 6px;
+  scrollbar-width: none;
+}
+.native .verse-strip::-webkit-scrollbar { display: none; }
+.native .mini-verse {
+  scroll-snap-align: start;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  padding: 22px 20px;
+  min-height: 0;
+}
+.native .daily-verse { border-radius: 14px; margin-top: 40px; padding: 34px 22px; }
+
+/* ---------- Review ---------- */
+
+.native .review-page { padding: 14px max(16px, var(--safe-left)) calc(28px + var(--safe-bottom)) max(16px, var(--safe-right)); }
+/* main already insets by the status bar; a second inset here left a dead band. */
+.native .review-top button { min-height: var(--touch); }
+.native .recall-card {
+  min-height: 0;
+  margin: 18px auto 14px;
+  padding: 32px 20px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(45,53,47,.07);
+}
+.native .recall-card h1 { font-size: 27px; margin: 10px 0 26px; }
+.native .recall-card > p { font-size: clamp(20px, 5.2vw, 25px); line-height: 1.75; }
+
+.native .ratings > div { grid-template-columns: 1fr 1fr; gap: 10px; }
+.native .ratings button { min-height: 56px; border-radius: 10px; }
+
+/* Word blanks must be tappable, not just readable. */
+.native .word-blank,
+.native .word-input { min-height: 38px; font-size: 16px; padding: 4px 12px; }
+.native .word-blank { min-width: 84px; }
+
+/* The tray docks above the home indicator rather than flowing inline, so the choices
+   stay reachable while the verse scrolls. */
+.native .choice-tray {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: var(--z-tray);
+  max-width: none;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid #d7c6ad;
+  border-radius: 14px 14px 0 0;
+  padding: 16px max(14px, var(--safe-left)) calc(14px + var(--safe-bottom)) max(14px, var(--safe-right));
+  box-shadow: 0 -10px 30px rgba(54,61,53,.14);
+  animation: sheetUp .22s cubic-bezier(.32,.72,0,1);
+}
+.native .choice-tray button { min-height: 50px; border-radius: 10px; }
+/* The docked tray overlays the card, so the card has to end above it. */
+.native .review-page:has(.choice-tray) .recall-card { padding-bottom: 210px; }
+.native .mode-switch { display: grid; grid-template-columns: repeat(2, 1fr); width: 100%; gap: 4px; }
+.native .mode-switch button { min-height: 46px; border-radius: 8px; }
+.native .impossible-recall textarea { border-radius: 10px; font-size: 18px; }
+
+/* ---------- Reels ---------- */
+
+.native .reels-toolbar {
+  padding: var(--safe-top) max(12px, var(--safe-left)) 10px max(12px, var(--safe-right));
+  height: auto;
+  min-height: 0;
+  gap: 10px;
+}
+/* The fixed right padding clipped the translation name. */
+.native .reels-toolbar select {
+  width: auto;
+  min-width: 86px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #fff;
+}
+.native .reels-controls { gap: 10px; }
+.native .reel-mode button { min-height: 38px; }
+.native .reel-feed,
+.native .reel-loading,
+.native .verse-reels-shell { height: auto; flex: 1; min-height: 0; }
+.native .reels-page { display: flex; flex-direction: column; }
+
+/* Clear the tab bar, which now stays visible on Reels. */
+.native .reel { padding-bottom: calc(96px + var(--tab-total)); }
+.native .reel > button { bottom: calc(20px + var(--tab-total)); min-height: var(--touch); border-radius: 30px; }
+.native .reel > small { bottom: calc(4px + var(--tab-total)); }
+.native .scroll-cue, .native .swipe-prompt { display: none; }
+.native .reel-nav { right: 14px; }
+.native .reel-nav button { width: var(--touch); height: var(--touch); }
+/* Sits below .reels-toolbar, which already carries the top inset. */
+.native .back-to-books { top: 10px; min-height: var(--touch); border-radius: 24px; }
+.native .book-neighbors, .native .verse-sequence { bottom: calc(6px + var(--tab-total)); }
+
+/* ---------- Library and Memory Bank ---------- */
+
+.native .library-stats,
+.native .history-summary { border-radius: 12px; overflow: hidden; }
+.native .library-list article { grid-template-columns: 48px 1fr 44px; gap: 14px; padding: 20px 2px; align-items: start; }
+.native .library-copy h3 { font-size: 19px; }
+.native .mastery { width: 100px; }
+.native .memory-bank-grid article,
+.native .memory-bank-quiz,
+.native .memory-bank-search { border-radius: 12px; }
+.native .memory-bank-search { min-height: 52px; }
+.native .memorized-toggle { min-height: var(--touch); }
+.native .store-verse { padding: 20px 2px; }
+.native .store-verse > button { min-width: var(--touch); min-height: var(--touch); border-radius: 10px; }
+.native .community-grid article { border-radius: 12px; }
+
+/* ---------- Settings ---------- */
+
+.native .settings-panel { border: 0; border-radius: 0; padding: 0; background: none; }
+.native .settings-panel > div {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.native .settings-panel h2 { font-size: 23px; margin: 4px 0 14px; }
+.native .settings-panel label { max-width: none; }
+.native .settings-panel .primary { width: 100%; min-height: 52px; border-radius: 10px; }
+.native .toggle-line { min-height: 48px; }
+
+/* Checkbox as a real switch. */
+.native .toggle-line input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 50px;
+  height: 30px;
+  flex: none;
+  border-radius: 15px;
+  background: #d6d3c9;
+  position: relative;
+  transition: background .2s ease;
+}
+.native .toggle-line input[type="checkbox"]:checked { background: #5c8169; }
+.native .toggle-line input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  transition: transform .2s ease;
+}
+.native .toggle-line input[type="checkbox"]:checked::after { transform: translateX(20px); }
+
+.native .install-button, .native .install-help, .native .installed-state { border-radius: 10px; min-height: var(--touch); }
+
+/* ---------- Typography trim ---------- */
+
+/* Display sizes tuned for a 1180px editorial column overflow a phone column. */
+.native .welcome h1,
+.native .page-title h1 { font-size: clamp(34px, 9vw, 44px); letter-spacing: -.02em; }
+.native .section-heading h2,
+.native .browse-head h2,
+.native .library-toolbar h2 { font-size: 24px; }
+
+.native h1, .native h2, .native h3 { text-wrap: balance; }
