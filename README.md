@@ -6,7 +6,7 @@
 
 Ruminate helps you memorize Scripture through daily review and an easy-to-browse Bible feed. Study on the web or in the native Android and iOS projects, with your library and progress saved to your account.
 
-**[Open the web app](https://selah.simmonsweb.com/)** · **[Download the Android APK](https://github.com/bsimmons123/ruminate/releases/latest)** · **[Report an issue](https://github.com/bsimmons123/ruminate/issues)**
+**[Open the web app](https://ruminate.simmonsweb.com/)** · **[Download the Android APK](https://github.com/bsimmons123/ruminate/releases/latest)** · **[Report an issue](https://github.com/bsimmons123/ruminate/issues)**
 
 ## Features
 
@@ -51,7 +51,7 @@ VITE_API_BASE_URL=http://localhost:3001 npm run mobile:ios
 
 `mobile:android` and `mobile:ios` build, sync, and open the platform project. `RUMINATE_MOBILE_DEV_HTTP=true` enables Android mixed content only for local testing; leave it unset for release builds. A release build should use a reachable HTTPS API. Android Studio and the Android SDK are required to compile Android; Xcode and Apple signing are required to compile iOS. The generated native projects have Ruminate icons and splash screens from `assets/logo.svg`.
 
-For a production-targeted mobile build, run `npm run mobile:sync:prod`. This packages `https://selah.simmonsweb.com` as the API base URL for both platforms. Build the native project after syncing; for an installable Android test APK, run `cd android && ./gradlew assembleDebug`. This command only creates a local artifact. The production backend must include the native bearer-session, device-registration, Bible-book, and CORS routes from this version before that APK can sign in. Android store distribution additionally requires release signing.
+For a production-targeted mobile build, run `npm run mobile:sync:prod`. This packages `https://ruminate.simmonsweb.com` as the API base URL for both platforms. Build the native project after syncing; for an installable Android test APK, run `cd android && ./gradlew assembleDebug`. This command only creates a local artifact. The production backend must include the native bearer-session, device-registration, Bible-book, and CORS routes from this version before that APK can sign in. Android store distribution additionally requires release signing.
 
 Pushes to `master` in `bsimmons123/ruminate` run `.github/workflows/publish-android.yml`, which builds a signed production-targeted APK and attaches it with a SHA-256 checksum to a GitHub Release named for the commit. The workflow needs four repository secrets: `ANDROID_KEYSTORE_BASE64` (base64 of the Android signing keystore), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Keep the original keystore and passwords backed up securely; future APKs must use the same key to update an installed app. A `workflow_dispatch` run can retry publishing after the backend is updated.
 
@@ -166,7 +166,7 @@ Mark a verse as memorized in My Library, or reach stage 6 with at least 90% accu
 
 ## Rename compatibility
 
-Ruminate retains the existing `com.selah.scripturememory` installation ID, signing key, saved-data keys, database names, and Compose deployment identity so existing installs and deployments keep their accounts and progress. The API remains at `https://selah.simmonsweb.com` until a new domain is configured. New container images are published under `ghcr.io/bsimmons123/ruminate`.
+Ruminate retains the existing `com.selah.scripturememory` installation ID, signing key, saved-data keys, database names, and Compose deployment identity so existing installs and deployments keep their accounts and progress. Production mobile builds connect to `https://ruminate.simmonsweb.com`. New container images are published under `ghcr.io/bsimmons123/ruminate`.
 
 Container publication builds AMD64 on `ubuntu-24.04` and ARM64 on `ubuntu-24.04-arm`. Each image must load Node and the server dependencies on its native runner before the combined `latest` and commit tags are published. This avoids running Node under QEMU during dependency installation.
 

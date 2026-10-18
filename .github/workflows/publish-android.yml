@@ -89,5 +89,5 @@ jobs:
               "$RUNNER_TEMP/ruminate-android.apk.sha256" \
               --target "$GITHUB_SHA" \
               --title "$title" \
-              --notes 'Installable Android APK configured for https://selah.simmonsweb.com. Requires the matching Ruminate backend API.'
+              --notes 'Installable Android APK configured for https://ruminate.simmonsweb.com. Requires the matching Ruminate backend API.'
           fi
