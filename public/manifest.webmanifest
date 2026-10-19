@@ -10,7 +10,9 @@
   "theme_color": "#24493c",
   "categories": ["education", "lifestyle"],
   "icons": [
-    { "src": "/icons/ruminate.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/icons/ruminate-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    { "src": "/icons/ruminate-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/ruminate-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/ruminate-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/ruminate.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

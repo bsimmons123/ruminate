@@ -607,3 +607,16 @@
 .native .library-toolbar h2 { font-size: 24px; }
 
 .native h1, .native h2, .native h3 { text-wrap: balance; }
+
+/* ---------- Account deletion ---------- */
+
+.native .danger-zone { margin-top: 4px; padding: 20px; border: 1px solid #e3cdc6; border-radius: 12px; background: var(--paper); }
+.native .danger-zone h2 { font-size: 21px; }
+.native .danger-button { width: 100%; min-height: 52px; border-radius: 10px; justify-content: center; }
+.native .danger-confirm input { height: 52px; border-radius: 10px; font-size: 16px; }
+.native .danger-actions { flex-direction: column-reverse; align-items: stretch; gap: 10px; }
+.native .danger-actions .text-button { justify-content: center; }
+
+/* The native app is already installed; the banner never renders there, but the rule
+   keeps it out of the layout if that ever changes. */
+.native .install-banner { display: none; }

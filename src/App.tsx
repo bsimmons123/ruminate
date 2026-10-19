@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BarChart3, BookHeart, BookOpen, Bookmark, Check, Download, Flame, History, Home, Layers3, Library, LogOut, Menu, Plus, Search, Settings, Sparkles, UserRound, WifiOff, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BarChart3, BookHeart, Bookmark, BookOpen, Check, Download, Flame, History, Home, Layers3, Library, LogOut, Menu, Plus, Search, Settings, Share, Sparkles, Trash2, UserRound, WifiOff, X } from "lucide-react";
 import { packs, verses } from "./data";
 import { getLibrary, getPassages, getReviews, getSettings, getUsers, removeItem, saveItem, savePassage, saveReview, saveSettings, saveUser, scheduledItem } from "./db";
 import { bibleBooks, DEFAULT_TRANSLATION, fetchBibleBook, fetchPassage, fetchPassageVerses, translations } from "./bible";
 import { esvStoredCount, parseEsvReference } from "./esvCompliance";
 import { hashPassword, SESSION_KEY } from "./auth";
-import { apiCollections, apiCommunityTags, apiCurrentUser, apiDelete, apiItems, apiPut, apiSignIn, apiSignOut, apiSignUp, apiSyncPending, serverEnabled } from "./api";
+import { shouldOfferInstall } from "./installPrompt";
+import { apiCollections, apiCommunityTags, apiCurrentUser, apiDelete, apiDeleteAccount, apiItems, apiPut, apiSignIn, apiSignOut, apiSignUp, apiSyncPending, serverEnabled } from "./api";
 import type { ConnectionState } from "./api";
 import { currentPushToken, disablePush, enablePush, isNativeApp } from "./nativePush";
 import { App as NativeApp } from "@capacitor/app";
@@ -233,6 +234,23 @@ function App() {
     setSigningOut(false);
   }
 
+  /* Deletion is permanent. The server removes the account and cascades its data; this
+     clears the same local state sign-out does, so nothing survives on the device. */
+  async function deleteAccount() {
+    if (isNativeApp) await disablePush(false).catch(() => {});
+    await apiDeleteAccount();
+    localStorage.removeItem(SESSION_KEY);
+    setUser(null);
+    setUserSettings(null);
+    setLibrary([]);
+    setQuizIds(null);
+    setHistory([]);
+    setCatalog(verses);
+    setMenu(false);
+    setPage("home");
+    notify("Your account and all its data have been deleted.");
+  }
+
   const content = (
     <>
       {!isNativeApp && page !== "reels" && <header>
@@ -258,7 +276,7 @@ function App() {
         {page === "library" && <LibraryPage library={library} verseFor={verseFor} onRemove={toggleVerse} onUpdate={updateLibraryItem} onReview={() => navigate("review")} onStore={() => navigate("store")} />}
         {page === "memory-bank" && <MemoryBankPage items={memorizedItems} verseFor={verseFor} onQuiz={startMemoryQuiz} onLibrary={() => navigate("library")} onUpdate={updateLibraryItem} />}
         {page === "history" && <HistoryPage history={history} verseFor={verseFor} />}
-        {page === "settings" && settings && <SettingsPage user={user} settings={settings} onSave={updateSettings} onSignOut={signOut} signingOut={signingOut} />}
+        {page === "settings" && settings && <SettingsPage user={user} settings={settings} onSave={updateSettings} onSignOut={signOut} signingOut={signingOut} onDeleteAccount={deleteAccount} />}
         {page === "review" && <ReviewPage key={reviewItems[reviewIndex]?.verseId} items={reviewItems} index={reviewIndex} verse={reviewItems[reviewIndex] ? verseFor(reviewItems[reviewIndex].verseId) : undefined} onRate={rate} onClose={() => navigate(reviewReturn)} initialMode={quizIds ? "impossible" : "easy"} />}
       </main>
       {page !== "reels" && <div className="esv-global"><strong>Noncommercial Scripture-memory project</strong><p>Scripture quotations marked “ESV” are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved. The ESV text may not be quoted in any publication made available to the public by a Creative Commons license. The ESV may not be translated into any other language.</p><p>Users may not copy or download more than 500 verses of the ESV Bible or more than one half of any book of the ESV Bible.</p><a href="https://www.esv.org/" target="_blank" rel="noreferrer">Read at ESV.org</a></div>}
@@ -498,12 +516,86 @@ function BookVerseReels({ book, translation, pinned, onBack, onPin, readOnly = f
   return <div className="verse-reels-shell"><button className="back-to-books" onClick={onBack}><ArrowLeft/> All books</button><div ref={feedRef} className="reel-feed verse-book-feed" tabIndex={0} onScroll={event => { const element = event.currentTarget; const nextActive = Math.max(0, Math.min(bookVerses.length - 1, Math.round(element.scrollTop / element.clientHeight))); setActive(nextActive); bookAnchor.current = bookVerses[nextActive]?.reference || bookAnchor.current; if (nextActive >= bookVerses.length - 3) void loadMoreEsv(); }}><div className="reel-spacer" style={{ height: first * viewportHeight }} aria-hidden="true"/>{bookVerses.slice(first, last).map((verse, offset) => { const i = first + offset; return <article className={`reel book-verse reel-${Math.floor((verse.chapter - 1) / 2) % 4}`} key={verse.id}><div className="chapter-watermark">{verse.chapter}</div><div className="reel-content"><span>{book} · Chapter {verse.chapter}</span><blockquote>“{verse.text}”</blockquote><p>{verse.reference} <i>{translation}</i></p></div>{!readOnly && <button className={pinned.has(verse.id) ? "pinned" : ""} onClick={() => onPin(verse)}><Bookmark/>{pinned.has(verse.id) ? "Pinned" : "Pin to memorize"}</button>}{translation === "ESV" && <small>ESV® © 2001 Crossway. Used by permission.</small>}<div className="verse-sequence">Verse {i + 1}{translation === "ESV" && esvSource.current.length ? "+" : ` of ${bookVerses.length}`}</div>{i === 0 && <div className="swipe-prompt"><ArrowUp/> Swipe or scroll <ArrowDown/></div>}</article>; })}<div className="reel-spacer" style={{ height: (bookVerses.length - last) * viewportHeight }} aria-hidden="true"/></div><div className="reel-nav"><button onClick={() => move(-1)} disabled={active === 0} aria-label="Previous verse"><ArrowUp/></button><span>{active + 1}<i/> {bookVerses.length}{translation === "ESV" && esvSource.current.length ? "+" : ""}</span><button onClick={() => move(1)} disabled={active === bookVerses.length - 1 && !esvSource.current.length} aria-label="Next verse"><ArrowDown/></button></div></div>;
 }
 
-function SettingsPage({ user, settings, onSave, onSignOut, signingOut }: { user: User; settings: UserSettings; onSave: (value: UserSettings) => void; onSignOut: () => void; signingOut: boolean }) {
+function SettingsPage({ user, settings, onSave, onSignOut, signingOut, onDeleteAccount }: { user: User; settings: UserSettings; onSave: (value: UserSettings) => void; onSignOut: () => void; signingOut: boolean; onDeleteAccount: () => Promise<void> }) {
   const [draft, setDraft] = useState(settings);
-  return <div className="page settings-page"><section className="page-title"><p className="eyebrow">Your Ruminate</p><h1>Settings</h1><p>Shape a practice that fits your life.</p></section><div className="settings-layout"><aside><div className="settings-avatar">{user.name.split(" ").map(p => p[0]).join("").slice(0,2)}</div><h2>{user.name}</h2><p>{user.email}</p><span><UserRound/> Your account</span></aside><section className="settings-panel"><div><span className="overline">Scripture</span><h2>Reading preferences</h2><TranslationSelect value={draft.translation} onChange={translation => setDraft({ ...draft, translation })}/><small>This preference is the default everywhere Scripture is shown. You can still switch versions while reading.</small></div><div><span className="overline">Practice</span><h2>Daily rhythm</h2><label>Daily verse goal<input type="number" min="1" max="50" value={draft.dailyGoal} onChange={e => setDraft({ ...draft, dailyGoal: Number(e.target.value) })}/></label><label className="toggle-line"><span>Daily reminders<small>{isNativeApp ? "A push reminder at 9 a.m. when a verse is due." : "Managed in the Android and iOS app."}</small></span><input type="checkbox" disabled={!isNativeApp} checked={draft.reminders} onChange={e => setDraft({ ...draft, reminders: e.target.checked })}/></label></div>{!isNativeApp && <div><span className="overline">Mobile app</span><h2>Install Ruminate</h2><p className="install-copy">Add Ruminate to your home screen for a full-screen, app-like experience.</p><InstallAppButton/></div>}<button className="primary" onClick={() => onSave(draft)}>Save preferences <Check/></button></section></div><button className="signout" disabled={signingOut} onClick={onSignOut}><LogOut/> {signingOut ? "Signing out…" : "Sign out on this device"}</button></div>;
+  return <div className="page settings-page"><section className="page-title"><p className="eyebrow">Your Ruminate</p><h1>Settings</h1><p>Shape a practice that fits your life.</p></section><div className="settings-layout"><aside><div className="settings-avatar">{user.name.split(" ").map(p => p[0]).join("").slice(0,2)}</div><h2>{user.name}</h2><p>{user.email}</p><span><UserRound/> Your account</span></aside><section className="settings-panel"><div><span className="overline">Scripture</span><h2>Reading preferences</h2><TranslationSelect value={draft.translation} onChange={translation => setDraft({ ...draft, translation })}/><small>This preference is the default everywhere Scripture is shown. You can still switch versions while reading.</small></div><div><span className="overline">Practice</span><h2>Daily rhythm</h2><label>Daily verse goal<input type="number" min="1" max="50" value={draft.dailyGoal} onChange={e => setDraft({ ...draft, dailyGoal: Number(e.target.value) })}/></label><label className="toggle-line"><span>Daily reminders<small>{isNativeApp ? "A push reminder at 9 a.m. when a verse is due." : "Managed in the Android and iOS app."}</small></span><input type="checkbox" disabled={!isNativeApp} checked={draft.reminders} onChange={e => setDraft({ ...draft, reminders: e.target.checked })}/></label></div>{!isNativeApp && <div><span className="overline">Mobile app</span><h2>Install Ruminate</h2><p className="install-copy">Add Ruminate to your home screen for a full-screen, app-like experience.</p><InstallAppButton/></div>}<button className="primary" onClick={() => onSave(draft)}>Save preferences <Check/></button></section></div><button className="signout" disabled={signingOut} onClick={onSignOut}><LogOut/> {signingOut ? "Signing out…" : "Sign out on this device"}</button><DeleteAccountSection email={user.email} onDelete={onDeleteAccount}/></div>;
+}
+
+/* Account deletion is required to be reachable in-app (App Store guideline 5.1.1(v)),
+   but it is irreversible, so it is confirmed by typing the account's own email. */
+function DeleteAccountSection({ email, onDelete }: { email: string; onDelete: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const matches = typed.trim().toLowerCase() === email.toLowerCase();
+
+  async function confirm() {
+    if (!matches || busy) return;
+    setBusy(true); setError("");
+    try { await onDelete(); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Your account could not be deleted."); setBusy(false); }
+  }
+
+  return <div className="danger-zone">
+    <span className="overline">Account</span>
+    <h2>Delete account</h2>
+    <p>This permanently removes your account, your library, your saved passages, your review history and your reminder devices. It cannot be undone.</p>
+    {!open
+      ? <button className="danger-button" onClick={() => setOpen(true)}><Trash2 size={16}/> Delete my account</button>
+      : <div className="danger-confirm">
+          <label>Type <strong>{email}</strong> to confirm
+            <input value={typed} onChange={event => setTyped(event.target.value)} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-label={`Type ${email} to confirm deletion`}/>
+          </label>
+          {error && <p className="auth-error">{error}</p>}
+          <div className="danger-actions">
+            <button className="danger-button" disabled={!matches || busy} onClick={confirm}><Trash2 size={16}/> {busy ? "Deleting…" : "Permanently delete"}</button>
+            <button className="text-button" disabled={busy} onClick={() => { setOpen(false); setTyped(""); setError(""); }}>Cancel</button>
+          </div>
+        </div>}
+  </div>;
 }
 
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
+
+const INSTALL_DISMISSED = "ruminate-install-dismissed";
+const isStandalone = () =>
+  window.matchMedia("(display-mode: standalone)").matches ||
+  (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+/** Installing is the difference between a browser tab and an app that keeps its data:
+    iOS evicts unused site storage after about a week, but exempts installed web apps. */
+function InstallBanner() {
+  const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null);
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem(INSTALL_DISMISSED) === "true");
+  const [standalone, setStandalone] = useState(isStandalone);
+  useEffect(() => {
+    const ready = (event: Event) => { event.preventDefault(); setPrompt(event as InstallPromptEvent); };
+    const done = () => setStandalone(true);
+    window.addEventListener("beforeinstallprompt", ready);
+    window.addEventListener("appinstalled", done);
+    return () => { window.removeEventListener("beforeinstallprompt", ready); window.removeEventListener("appinstalled", done); };
+  }, []);
+
+  function dismiss() { localStorage.setItem(INSTALL_DISMISSED, "true"); setDismissed(true); }
+  const offer = shouldOfferInstall({
+    userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints,
+    standalone, dismissed, native: isNativeApp, hasPrompt: Boolean(prompt),
+  });
+  if (!offer) return null;
+
+  return <aside className="install-banner">
+    <Download size={20}/>
+    <div>
+      <strong>Add Ruminate to your Home Screen</strong>
+      {prompt
+        ? <p>Install it for full-screen practice that keeps working offline.</p>
+        : <p>Tap <Share size={13}/> Share, then <strong>Add to Home Screen</strong>. Ruminate opens full screen and keeps your verses offline. You will sign in once more there, because iOS gives installed apps their own storage.</p>}
+    </div>
+    {prompt && <button className="primary small" onClick={async () => { await prompt.prompt(); await prompt.userChoice; setPrompt(null); dismiss(); }}>Install</button>}
+    <button className="icon-button install-dismiss" aria-label="Dismiss install prompt" onClick={dismiss}><X size={17}/></button>
+  </aside>;
+}
 function InstallAppButton() {
   const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null); const [installed, setInstalled] = useState(window.matchMedia("(display-mode: standalone)").matches);
   useEffect(() => { const ready = (event: Event) => { event.preventDefault(); setPrompt(event as InstallPromptEvent); }; const done = () => setInstalled(true); window.addEventListener("beforeinstallprompt", ready); window.addEventListener("appinstalled", done); return () => { window.removeEventListener("beforeinstallprompt", ready); window.removeEventListener("appinstalled", done); }; }, []);
@@ -515,6 +607,7 @@ function InstallAppButton() {
 function HomePage({ due, streak, library, verseFor, onReview, onStore }: { due: number; streak: number; library: LibraryItem[]; verseFor: (id: string) => Verse; onReview: () => void; onStore: () => void }) {
   const today = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
   return <div className="page home-page">
+    <InstallBanner/>
     <section className="welcome"><div><p className="eyebrow">{today}</p><h1>Good morning.</h1><p>Make a little room for the Word today.</p><span className="mobile-streak"><Flame/> {streak}-day streak</span></div><div className="sun-ornament">✦</div></section>
     <section className="review-card"><div className="review-copy"><span className="overline"><Sparkles size={15} /> Today’s practice</span><h2>{due || library.length} {due === 1 ? "verse is" : "verses are"} ready for you</h2><p>A few quiet minutes now can keep these words close all day.</p>{isNativeApp && <div className="review-stats"><div><strong>{due || library.length}</strong><span>Due</span></div><div><strong>{library.length}</strong><span>In library</span></div><div><strong>{streak}</strong><span>Day streak</span></div></div>}<button className="primary" onClick={onReview}>Begin review <ArrowRight size={18} /></button></div><div className="progress-ring"><svg viewBox="0 0 100 100"><circle className="track" cx="50" cy="50" r="42"/><circle className="fill" cx="50" cy="50" r="42"/></svg><strong>{due || library.length}</strong><span>due</span></div></section>
     <div className="section-heading"><div><span className="overline">Continue learning</span><h2>Your verses</h2></div><button className="text-button" onClick={onStore}>Explore store <ArrowRight size={16}/></button></div>

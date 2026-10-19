@@ -65,6 +65,27 @@ app.post("/api/auth/signout", requireUser, async (req, res, next) => {
 });
 app.get("/api/auth/me", requireUser, async (req, res) => { const { rows } = await pool.query("select * from users where id=$1", [req.userId]); res.json(rows[0] ? safeUser(rows[0]) : null); });
 
+/* Permanent account deletion. App Store guideline 5.1.1(v) requires any app that creates
+   accounts to offer this in-app. user_data and push_devices cascade from users(id), so
+   removing the user row removes the saved library, passages, reviews, settings and push
+   registrations with it. The session is revoked in the same transaction so the deleted
+   account's token cannot be replayed before it expires. */
+app.delete("/api/account", requireUser, async (req, res, next) => {
+  const client = await pool.connect().catch(next);
+  if (!client) return;
+  try {
+    await client.query("begin");
+    await client.query("insert into revoked_sessions(token_hash,expires_at) values($1,$2) on conflict(token_hash) do nothing", [sessionHash(req.sessionToken), req.sessionExpiresAt]);
+    await client.query("delete from revoked_sessions where expires_at < now()");
+    const { rowCount } = await client.query("delete from users where id=$1", [req.userId]);
+    await client.query("commit");
+    res.clearCookie("selah_session", { sameSite: "lax", secure: process.env.COOKIE_SECURE === "true" });
+    if (!rowCount) return res.status(404).json({ error: "That account no longer exists." });
+    res.json({ ok: true });
+  } catch (error) { await client.query("rollback").catch(() => {}); next(error); }
+  finally { client.release(); }
+});
+
 app.get("/api/data/:kind", requireUser, async (req, res) => { if (!validKinds.has(req.params.kind)) return res.status(400).json({ error: "Invalid data type." }); const { rows } = await pool.query("select data from user_data where user_id=$1 and kind=$2 order by updated_at desc", [req.userId, req.params.kind]); res.json(rows.map(row => row.data)); });
 app.put("/api/data/:kind/:id", requireUser, async (req, res) => { if (!validKinds.has(req.params.kind)) return res.status(400).json({ error: "Invalid data type." }); await pool.query("insert into user_data(user_id,kind,item_id,data) values($1,$2,$3,$4) on conflict(user_id,kind,item_id) do update set data=excluded.data,updated_at=now()", [req.userId, req.params.kind, req.params.id, req.body]); res.json({ ok: true }); });
 app.delete("/api/data/:kind/:id", requireUser, async (req, res) => { if (!validKinds.has(req.params.kind)) return res.status(400).json({ error: "Invalid data type." }); await pool.query("delete from user_data where user_id=$1 and kind=$2 and item_id=$3", [req.userId, req.params.kind, req.params.id]); res.json({ ok: true }); });

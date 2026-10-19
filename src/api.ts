@@ -1,6 +1,6 @@
 import type { CommunityCollection, User } from "./types";
 import { Capacitor } from "@capacitor/core";
-import { acknowledgeChange, cachedItems, cacheServerItems, pendingChanges, queueChange, rememberedUser, rememberUser } from "./offline";
+import { acknowledgeChange, cachedItems, cacheServerItems, forgetAccount, pendingChanges, queueChange, rememberedUser, rememberUser } from "./offline";
 import type { PendingChange } from "./offline";
 import { SESSION_KEY } from "./auth";
 
@@ -134,6 +134,15 @@ export async function apiSignOut(deviceToken?: string | null) {
     if ((error as { status?: number }).status === 401) { clearSession(); return { ok: true }; }
     throw error;
   }
+}
+/* Deletion is irreversible and server-authoritative, so it is never queued for offline
+   replay: with no connection the request fails and the account is left untouched. */
+export async function apiDeleteAccount() {
+  const owner = requireAccount();
+  const value = await request<{ ok: boolean }>("/account", { method: "DELETE" });
+  await forgetAccount(owner).catch(() => {});
+  clearSession();
+  return value;
 }
 async function offlineItems<T>(owner: string, kind: string): Promise<T[]> {
   const items = await cachedItems<T>(owner, kind);

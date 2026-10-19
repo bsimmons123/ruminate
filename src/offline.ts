@@ -59,6 +59,22 @@ export async function pendingChanges(userId: string): Promise<PendingChange[]> {
   const changes = await result(db.transaction("outbox").objectStore("outbox").getAll()) as PendingChange[];
   return changes.filter(change => change.userId === userId).sort((a, b) => a.queuedAt - b.queuedAt);
 }
+/** Erase every local trace of an account: cached snapshots and any unsent changes.
+    Used by account deletion, so the device keeps nothing the server no longer has. */
+export async function forgetAccount(userId: string) {
+  const db = await open();
+  const transaction = db.transaction(["snapshots", "outbox"], "readwrite");
+  const committed = done(transaction);
+  const snapshots = transaction.objectStore("snapshots");
+  for (const key of await result(snapshots.getAllKeys()) as string[]) {
+    if (typeof key === "string" && key.startsWith(`${userId}:`)) snapshots.delete(key);
+  }
+  const outbox = transaction.objectStore("outbox");
+  for (const change of await result(outbox.getAll()) as PendingChange[]) {
+    if (change.userId === userId) outbox.delete(change.id);
+  }
+  await committed;
+}
 export async function cacheServerItems<T>(userId: string, kind: string, items: T[]): Promise<T[]> {
   const db = await open();
   const transaction = db.transaction(["snapshots", "outbox"], "readwrite"); const committed = done(transaction);
