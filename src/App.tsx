@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BarChart3, BookHeart, Bookmark, BookOpen, Check, Download, Flame, History, Home, Layers3, Library, LogOut, Menu, Plus, Search, Settings, Share, Sparkles, Trash2, UserRound, WifiOff, X } from "lucide-react";
 import { packs, verses } from "./data";
-import { getLibrary, getPassages, getReviews, getSettings, getUsers, removeItem, saveItem, savePassage, saveReview, saveSettings, saveUser, scheduledItem } from "./db";
+import { getLibrary, getPassages, getReviews, getSettings, getUsers, removeItem, removeReview, saveItem, savePassage, saveReview, saveSettings, saveUser, scheduledItem } from "./db";
 import { bibleBooks, DEFAULT_TRANSLATION, fetchBibleBook, fetchPassage, fetchPassageVerses, translations } from "./bible";
 import { esvStoredCount, parseEsvReference } from "./esvCompliance";
 import { hashPassword, SESSION_KEY } from "./auth";
@@ -21,6 +21,8 @@ import type { CommunityCollection, LibraryItem, ReviewRating, ReviewResult, Them
 
 type Page = "home" | "reels" | "store" | "library" | "memory-bank" | "history" | "settings" | "review" | "terms" | "privacy";
 type ExerciseSummary = Pick<ReviewResult, "mode" | "correct" | "total" | "percentage" | "answers">;
+/* Everything needed to put a rated verse, and the session it was rated in, back. */
+type UndoEntry = { item: LibraryItem; resultId: string; index: number; sessionIds: string[] | null; sessionKind: "review" | "quiz"; reviewReturn: Page };
 
 const starterIds = ["ps-46-10", "prov-3-5-6", "john-3-16"];
 const normalizeTranslation = (value: string | undefined): Translation => translations.some(item => item.id === value) ? value as Translation : DEFAULT_TRANSLATION;
@@ -66,6 +68,7 @@ function App() {
   /* Settings previews a theme as soon as it is tapped; the saved value takes over
      again when the page is left without saving. */
   const [themePreview, setThemePreview] = useState<Theme | null>(null);
+  const [undo, setUndo] = useState<UndoEntry | null>(null);
   const theme: Theme = themePreview ?? settings?.theme ?? "system";
   useEffect(() => {
     const root = document.documentElement;
@@ -148,11 +151,16 @@ function App() {
   useEffect(() => { currentPage.current = page; }, [page]);
   useEffect(() => { if (!isNativeApp || Capacitor.getPlatform() !== "android") return; let disposed = false; let remove: (() => Promise<void>) | undefined; void NativeApp.addListener("backButton", () => { if (document.body.dataset.sheetOpen === "true") { window.dispatchEvent(new Event("ruminate-close-sheet")); return; } if (currentPage.current === "home") void NativeApp.exitApp(); else { setPage("home"); setMenu(false); } }).then(handle => { if (disposed) void handle.remove(); else remove = () => handle.remove(); }); return () => { disposed = true; void remove?.(); }; }, []);
 
-  const due = library.filter(item => new Date(item.nextReview) <= new Date());
+  /* A library row can outlive its passage: library, passage, review and settings sync
+     independently, so a partial sync leaves an id with no text behind it. Returning
+     undefined keeps those rows out of the UI instead of crashing a render. */
+  const verseFor = (id: string) => catalog.find(v => v.id === id);
+  const knownItems = library.filter(item => catalog.some(verse => verse.id === item.verseId));
+  const unreadableCount = library.length - knownItems.length;
+  const due = knownItems.filter(item => new Date(item.nextReview) <= new Date());
   const streak = reviewStreak(history);
   const reviewItems = (sessionIds ?? []).flatMap(id => { const item = library.find(value => value.verseId === id); return item ? [item] : []; });
-  const memorizedItems = library.filter(item => isMemorized(item) && catalog.some(verse => verse.id === item.verseId));
-  const verseFor = (id: string) => catalog.find(v => v.id === id)!;
+  const memorizedItems = knownItems.filter(isMemorized);
   const topics = ["All", ...Array.from(new Set(catalog.flatMap(v => v.topics)))];
   const filtered = useMemo(() => catalog.filter(v => {
     const haystack = `${v.reference} ${v.text} ${v.topics.join(" ")} ${v.pack}`.toLowerCase();
@@ -161,7 +169,36 @@ function App() {
 
   function notify(message: string) {
     setToast(message);
+    setUndo(null);
     window.setTimeout(() => setToast(""), 2400);
+  }
+
+  /* A rating is written and the session advances immediately, so a mis-tap is
+     otherwise unrecoverable. The offer stands for as long as the toast does. */
+  function offerUndo(message: string, entry: UndoEntry) {
+    setToast(message);
+    setUndo(entry);
+    window.setTimeout(() => { setToast(""); setUndo(current => current === entry ? null : current); }, 6000);
+  }
+
+  async function undoRating() {
+    const entry = undo;
+    if (!entry || reviewSaving.current) return;
+    reviewSaving.current = true;
+    setUndo(null); setToast("");
+    try {
+      if (serverEnabled) { await apiPut("library", entry.item.verseId, entry.item); await apiDelete("review", entry.resultId); }
+      else { await saveItem(entry.item); await removeReview(entry.resultId); }
+      setLibrary(items => items.map(item => item.verseId === entry.item.verseId ? entry.item : item));
+      setHistory(results => results.filter(result => result.id !== entry.resultId));
+      setSessionIds(entry.sessionIds);
+      setSessionKind(entry.sessionKind);
+      setReviewIndex(entry.index);
+      setReviewReturn(entry.reviewReturn);
+      setPage("review");
+      notify("Rating undone");
+    } catch { notify("Could not undo that rating."); }
+    finally { reviewSaving.current = false; }
   }
 
   async function toggleVerse(verse: Verse) {
@@ -218,13 +255,15 @@ function App() {
       if (serverEnabled) await apiPut("review", result.id, result); else await saveReview(result);
       setHistory(results => [result, ...results]);
       setLibrary(items => items.map(item => item.verseId === updated.verseId ? updated : item));
+      const entry: UndoEntry = { item: current, resultId: result.id, index: reviewIndex, sessionIds, sessionKind, reviewReturn };
       if (reviewIndex < reviewItems.length - 1) {
         setReviewIndex(i => i + 1);
+        offerUndo(`Marked ${rating}`, entry);
       } else {
         setReviewIndex(0);
         setPage(reviewReturn);
         setSessionIds(null);
-        notify(sessionKind === "quiz" ? "Memory Bank quiz complete" : "Review complete — well done");
+        offerUndo(sessionKind === "quiz" ? "Memory Bank quiz complete" : "Review complete — well done", entry);
       }
     } catch { notify("Could not save your review. Please try again."); }
     finally { reviewSaving.current = false; }
@@ -233,7 +272,7 @@ function App() {
   /* Honour the spaced-repetition schedule: practise what is due, and when nothing is
      due offer a fresh, shuffled set rather than the same list in the same order. */
   function startReview(from: Page = "home") {
-    setSessionIds(buildReviewQueue(library, history, { limit: settings?.dailyGoal }).verseIds);
+    setSessionIds(buildReviewQueue(knownItems, history, { limit: settings?.dailyGoal }).verseIds);
     setSessionKind("review");
     setReviewIndex(0);
     setReviewReturn(from);
@@ -328,7 +367,7 @@ function App() {
         {page === "home" && <HomePage due={due.length} goal={settings?.dailyGoal ?? 0} streak={streak} library={library} verseFor={verseFor} onReview={() => navigate("review")} onStore={() => navigate("store")} />}
         {page === "reels" && <ReelsPage catalog={catalog} library={library} translation={settings?.translation || DEFAULT_TRANSLATION} onBack={() => navigate("home")} onPin={toggleVerse} onImport={importVerse} />}
         {page === "store" && <StorePage filtered={filtered} topics={topics} topic={topic} query={query} library={library} preferredTranslation={settings?.translation || DEFAULT_TRANSLATION} onQuery={setQuery} onTopic={setTopic} onToggle={toggleVerse} onCollection={addCollection} onImport={importVerse} />}
-        {page === "library" && <LibraryPage library={library} verseFor={verseFor} onRemove={toggleVerse} onUpdate={updateLibraryItem} onReview={() => navigate("review")} onStore={() => navigate("store")} />}
+        {page === "library" && <LibraryPage library={library} verseFor={verseFor} unreadableCount={unreadableCount} onRemove={toggleVerse} onUpdate={updateLibraryItem} onReview={() => navigate("review")} onStore={() => navigate("store")} />}
         {page === "memory-bank" && <MemoryBankPage items={memorizedItems} verseFor={verseFor} onQuiz={startMemoryQuiz} onLibrary={() => navigate("library")} onUpdate={updateLibraryItem} />}
         {page === "history" && <HistoryPage history={history} verseFor={verseFor} />}
         {page === "terms" && <TermsPage onBack={() => navigate("home")} />}
@@ -340,7 +379,7 @@ function App() {
       {(!online || connection.mode !== "online" || connection.pending > 0) && <div className="offline-badge" role="status"><WifiOff/>{connection.mode === "syncing" ? "Syncing saved practice…" : `Saved on this device${connection.pending ? ` · ${connection.pending} updates waiting to sync` : " · Offline access"}`}</div>}
 
       {!isNativeApp && page !== "review" && page !== "reels" && <nav className="mobile-tabs"><button className={page === "home" ? "active" : ""} onClick={() => navigate("home")}><Home />Today</button><button onClick={() => navigate("reels")}><Sparkles />Reels</button><button className={page === "store" ? "active" : ""} onClick={() => navigate("store")}><BookOpen />Store</button><button className={page === "library" ? "active" : ""} onClick={() => navigate("library")}><Library />Library</button><button className={page === "memory-bank" ? "active" : ""} onClick={() => navigate("memory-bank")}><BookHeart />Memory Bank</button></nav>}
-      {toast && <div className="toast"><Check size={17} />{toast}</div>}
+      {toast && <div className="toast"><Check size={17} />{toast}{undo && <button className="toast-undo" onClick={() => void undoRating()}>Undo</button>}</div>}
     </>
   );
 
@@ -652,14 +691,20 @@ function InstallAppButton() {
   return <button className="install-button" onClick={async () => { await prompt.prompt(); const choice = await prompt.userChoice; if (choice.outcome === "accepted") setInstalled(true); setPrompt(null); }}><Download/> Install Ruminate</button>;
 }
 
-function HomePage({ due, goal, streak, library, verseFor, onReview, onStore }: { due: number; goal: number; streak: number; library: LibraryItem[]; verseFor: (id: string) => Verse; onReview: () => void; onStore: () => void }) {
-  const today = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
+function HomePage({ due, goal, streak, library, verseFor, onReview, onStore }: { due: number; goal: number; streak: number; library: LibraryItem[]; verseFor: (id: string) => Verse | undefined; onReview: () => void; onStore: () => void }) {
+  const now = new Date();
+  const today = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(now);
+  const hour = now.getHours();
+  const [greeting, invitation] = hour < 12 ? ["Good morning.", "Make a little room for the Word today."]
+    : hour < 17 ? ["Good afternoon.", "Make a little room for the Word today."]
+    : hour < 21 ? ["Good evening.", "A few verses before the day closes."]
+    : ["Rest well.", "One last pass before you sleep."];
   return <div className="page home-page">
     <InstallBanner/>
-    <section className="welcome"><div><p className="eyebrow">{today}</p><h1>Good morning.</h1><p>Make a little room for the Word today.</p><span className="mobile-streak"><Flame/> {streak}-day streak</span></div><div className="sun-ornament">✦</div></section>
+    <section className="welcome"><div><p className="eyebrow">{today}</p><h1>{greeting}</h1><p>{invitation}</p><span className="mobile-streak"><Flame/> {streak}-day streak</span></div><div className="sun-ornament">✦</div></section>
     <section className="review-card"><div className="review-copy"><span className="overline"><Sparkles size={15} /> Today’s practice</span><h2>{due ? `${due} ${due === 1 ? "verse is" : "verses are"} ready for you` : "You are caught up for now"}</h2><p>{!due ? "Nothing is scheduled yet. Keep going and we will draw from the verses you have not practised today." : goal > 0 && due > goal ? `This session covers the ${goal} most overdue, your daily goal. The rest stay due.` : "A few quiet minutes now can keep these words close all day."}</p>{isNativeApp && <div className="review-stats"><div><strong>{due}</strong><span>Due</span></div><div><strong>{library.length}</strong><span>In library</span></div><div><strong>{streak}</strong><span>Day streak</span></div></div>}<button className="primary" onClick={onReview}>{due ? "Begin review" : "Practise anyway"} <ArrowRight size={18} /></button></div><div className="progress-ring"><svg viewBox="0 0 100 100"><circle className="track" cx="50" cy="50" r="42"/><circle className="fill" cx="50" cy="50" r="42"/></svg><strong>{due}</strong><span>due</span></div></section>
     <div className="section-heading"><div><span className="overline">Continue learning</span><h2>Your verses</h2></div><button className="text-button" onClick={onStore}>Explore store <ArrowRight size={16}/></button></div>
-    <div className="verse-strip">{library.slice(0, 3).map((item, i) => { const v = verseFor(item.verseId); return <article className="mini-verse" key={v.id}><span className="count">0{i + 1}</span><p>“{v.text.length > 115 ? v.text.slice(0, 115) + "…" : v.text}”</p><div><strong>{v.reference}</strong><span>{item.reviews ? `${item.reviews} reviews` : "New"}</span></div></article> })}</div>
+    <div className="verse-strip">{library.flatMap(item => { const v = verseFor(item.verseId); return v ? [[item, v] as const] : []; }).slice(0, 3).map(([item, v], i) => { return <article className="mini-verse" key={v.id}><span className="count">0{i + 1}</span><p>“{v.text.length > 115 ? v.text.slice(0, 115) + "…" : v.text}”</p><div><strong>{v.reference}</strong><span>{item.reviews ? `${item.reviews} reviews` : "New"}</span></div></article> })}</div>
     <section className="daily-verse"><div className="leaf">❧</div><span className="overline">Verse for today</span><blockquote>“Thy word is a lamp unto my feet,<br/>and a light unto my path.”</blockquote><p>Psalm 119:105 <i>KJV</i></p></section>
   </div>;
 }
@@ -700,16 +745,17 @@ function BibleBrowser({ preferredTranslation, onImport }: { preferredTranslation
   return <section className="bible-browser"><div><span className="overline">The whole Bible</span><h2>Add any passage</h2><p>Choose a book, chapter, verse or range, and translation.</p></div><div className="passage-picker"><label>Book<select value={book} onChange={e => { setBook(e.target.value); setChapter(1); }}>{bibleBooks.map(([name]) => <option key={name}>{name}</option>)}</select></label><label>Chapter<select value={chapter} onChange={e => setChapter(Number(e.target.value))}>{Array.from({ length: maxChapters }, (_, i) => <option key={i + 1}>{i + 1}</option>)}</select></label><label>Verse(s)<input value={verseRange} onChange={e => setVerseRange(e.target.value.replace(/[^0-9-]/g, ""))} placeholder="1 or 1-5"/></label><TranslationSelect value={translation} onChange={setTranslation}/><button className="primary" onClick={add} disabled={loading || !verseRange}>{loading ? "Loading…" : <><Plus/> Add passage</>}</button></div>{error && <p className="browser-error">{error}</p>}<small>{translation === "WEB" ? "World English Bible Classic · Public domain · Available offline." : translation === "ESV" ? <>ESV requires a free Crossway API key. <a href="https://api.esv.org/" target="_blank" rel="noreferrer">Get one here.</a></> : `${translations.find(item => item.id === translation)?.name} · Available offline.`}</small></section>;
 }
 
-function LibraryPage({ library, verseFor, onRemove, onUpdate, onReview, onStore }: { library: LibraryItem[]; verseFor: (id: string) => Verse; onRemove: (v: Verse) => void; onUpdate: (item: LibraryItem) => void; onReview: () => void; onStore: () => void }) {
+function LibraryPage({ library, verseFor, unreadableCount, onRemove, onUpdate, onReview, onStore }: { library: LibraryItem[]; verseFor: (id: string) => Verse | undefined; unreadableCount: number; onRemove: (v: Verse) => void; onUpdate: (item: LibraryItem) => void; onReview: () => void; onStore: () => void }) {
   const collections = Array.from(new Set(library.map(i => i.collection)));
   const [tagFilter, setTagFilter] = useState("All");
   const personalTags = Array.from(new Set(library.flatMap(item => item.tags || []))).sort();
   const shown = tagFilter === "All" ? library : library.filter(item => item.tags?.includes(tagFilter));
   return <div className="page library-page"><section className="page-title"><p className="eyebrow">Your quiet treasury</p><h1>My Library</h1><p>{library.length} passages you’re carrying with you.</p></section>
     <div className="library-stats"><div><BookHeart/><strong>{library.length}</strong><span>Verses saved</span></div><div><Layers3/><strong>{collections.length}</strong><span>Collections</span></div><div><Flame/><strong>{library.reduce((sum, i) => sum + i.reviews, 0)}</strong><span>Reviews</span></div></div>
+    {unreadableCount > 0 && <p className="library-sync-notice">Still syncing: {unreadableCount} saved {unreadableCount === 1 ? "verse" : "verses"}. {unreadableCount === 1 ? "It appears" : "They appear"} here once the text reaches this device.</p>}
     <div className="library-toolbar"><div><span className="overline">All verses</span><h2>Growing in your heart</h2></div><button className="primary small" onClick={onReview}>Practice now <ArrowRight/></button></div>
     {personalTags.length > 0 && <div className="personal-tag-filter"><span>Filter by tag</span><button className={tagFilter === "All" ? "active" : ""} onClick={() => setTagFilter("All")}>All</button>{personalTags.map(tag => <button className={tagFilter === tag ? "active" : ""} onClick={() => setTagFilter(tag)} key={tag}>#{tag}</button>)}</div>}
-    {library.length ? <div className="library-list">{shown.map(item => { const v = verseFor(item.verseId); return <article key={v.id}><div className="book-tile">{v.book.slice(0, 2).toUpperCase()}</div><div className="library-copy"><span>{item.collection}</span><h3>{v.reference} <i>{v.translation}</i></h3><p>{v.text}</p><TagEditor item={item} onUpdate={onUpdate}/><div className="mastery"><span style={{ width: `${Math.min(100, item.stage * 18)}%` }}/></div><small>Stage {item.stage} · {item.reviews} reviews</small><button className="memorized-toggle" aria-pressed={isMemorized(item)} onClick={() => void Promise.resolve(onUpdate({ ...item, memorized: !isMemorized(item) })).catch(() => {})}>{isMemorized(item) ? "✓ Memorized · move back to learning" : "Mark as memorized"}</button></div><button className="icon-button" title="Remove verse" onClick={() => onRemove(v)}><X/></button></article> })}</div> : <div className="empty"><BookOpen/><h2>Your library is waiting</h2><p>Choose a few passages to begin your practice.</p><button className="primary" onClick={onStore}>Explore Verse Store</button></div>}
+    {library.length ? <div className="library-list">{shown.flatMap(item => { const v = verseFor(item.verseId); return v ? [[item, v] as const] : []; }).map(([item, v]) => { return <article key={v.id}><div className="book-tile">{v.book.slice(0, 2).toUpperCase()}</div><div className="library-copy"><span>{item.collection}</span><h3>{v.reference} <i>{v.translation}</i></h3><p>{v.text}</p><TagEditor item={item} onUpdate={onUpdate}/><div className="mastery"><span style={{ width: `${Math.min(100, item.stage * 18)}%` }}/></div><small>Stage {item.stage} · {item.reviews} reviews</small><button className="memorized-toggle" aria-pressed={isMemorized(item)} onClick={() => void Promise.resolve(onUpdate({ ...item, memorized: !isMemorized(item) })).catch(() => {})}>{isMemorized(item) ? "✓ Memorized · move back to learning" : "Mark as memorized"}</button></div><button className="icon-button" title="Remove verse" onClick={() => onRemove(v)}><X/></button></article> })}</div> : <div className="empty"><BookOpen/><h2>Your library is waiting</h2><p>Choose a few passages to begin your practice.</p><button className="primary" onClick={onStore}>Explore Verse Store</button></div>}
   </div>;
 }
 
@@ -719,7 +765,7 @@ function TagEditor({ item, onUpdate }: { item: LibraryItem; onUpdate: (item: Lib
   return <div className="personal-tags">{tags.map(tag => <span key={tag}>#{tag}<button aria-label={`Remove ${tag} tag`} onClick={() => onUpdate({ ...item, tags: tags.filter(value => value !== tag) })}>×</button></span>)}{editing ? <form onSubmit={event => { event.preventDefault(); add(); }}><input autoFocus value={value} maxLength={24} onChange={event => setValue(event.target.value)} onBlur={() => { if (value.trim()) add(); else setEditing(false); }} placeholder="e.g. morning"/></form> : <button className="add-tag" onClick={() => setEditing(true)}><Plus/> Tag</button>}</div>;
 }
 
-function HistoryPage({ history, verseFor }: { history: ReviewResult[]; verseFor: (id: string) => Verse }) {
+function HistoryPage({ history, verseFor }: { history: ReviewResult[]; verseFor: (id: string) => Verse | undefined }) {
   const average = history.length ? Math.round(history.reduce((sum, r) => sum + r.percentage, 0) / history.length) : 0;
   const recent = history.slice(0, 8).reverse();
   const verseGroups = Array.from(new Set(history.map(r => r.verseId))).map(id => ({ id, results: history.filter(r => r.verseId === id) }));
@@ -765,7 +811,7 @@ function ReviewPage({ items, index, verse, onRate, onClose, initialMode = "easy"
 
   return <div className="review-page"><div className="review-top"><button onClick={onClose}><ArrowLeft/> End session</button><span>{index + 1} of {items.length}</span><div className="review-progress"><i style={{ width: `${((index + 1) / items.length) * 100}%` }}/></div></div><section className="recall-card interactive"><span className="overline">Recall from memory</span><h1>{verse.reference}</h1><div className="mode-switch" role="group" aria-label="Review difficulty"><button className={mode === "easy" ? "active" : ""} onClick={() => changeMode("easy")}>Easy <span>choose words</span></button><button className={mode === "medium" ? "active" : ""} onClick={() => changeMode("medium")}>Medium <span>type single blanks</span></button><button className={mode === "hard" ? "active" : ""} onClick={() => changeMode("hard")}>Hard <span>type paired blanks</span></button><button className={mode === "impossible" ? "active" : ""} onClick={() => changeMode("impossible")}>Impossible <span>recall everything</span></button></div>
     {mode !== "impossible" && <><div className="blank-guide"><span>Blank {activeBlank === null ? blankIndexes.length : blankIndexes.indexOf(activeBlank) + 1} of {blankIndexes.length}</span><i><b style={{ width: `${((Object.keys(answers).filter(key => answers[Number(key)]).length) / blankIndexes.length) * 100}%` }}/></i><small>{mode === "easy" ? "Choose the word that belongs in the highlighted space" : mode === "hard" ? "Recall each pair of adjacent missing words" : "Type the missing word, then press Enter to continue"}</small></div>
-    <div className="passage-exercise">{words.map((word, i) => blankIndexes.includes(i) ? mode === "easy" ? <button key={i} aria-current={activeBlank === i ? "step" : undefined} className={`word-blank ${activeBlank === i ? "active" : ""} ${answers[i] ? "filled" : ""} ${graded ? isCorrect(i) ? "correct" : "incorrect" : ""}`} onClick={() => !graded && setActiveBlank(i)}>{answers[i] || "•••••"}</button> : <input key={i} ref={element => { inputRefs.current[i] = element; }} aria-label={`Missing word ${blankIndexes.indexOf(i) + 1}`} className={`word-input ${activeBlank === i ? "active" : ""} ${graded ? isCorrect(i) ? "correct" : "incorrect" : ""}`} value={answers[i] || ""} disabled={graded} style={{ width: `${Math.max(62, cleanWord(word).length * 13)}px` }} onFocus={() => setActiveBlank(i)} onChange={e => setAnswers({ ...answers, [i]: e.target.value })} onKeyDown={e => { if ((e.key === "Enter" || e.key === "Tab") && answers[i]?.trim()) { e.preventDefault(); setActiveBlank(nextBlank(i)); } }}/> : <span key={i}>{word} </span>)}</div></>}
+    <div className="passage-exercise">{words.map((word, i) => blankIndexes.includes(i) ? mode === "easy" ? <button key={i} aria-current={activeBlank === i ? "step" : undefined} className={`word-blank ${activeBlank === i ? "active" : ""} ${answers[i] ? "filled" : ""} ${graded ? isCorrect(i) ? "correct" : "incorrect" : ""}`} onClick={() => !graded && setActiveBlank(i)}>{answers[i] || "•••••"}</button> : <input key={i} ref={element => { inputRefs.current[i] = element; }} aria-label={`Missing word ${blankIndexes.indexOf(i) + 1}`} className={`word-input ${activeBlank === i ? "active" : ""} ${graded ? isCorrect(i) ? "correct" : "incorrect" : ""}`} value={answers[i] || ""} disabled={graded} style={{ width: `${Math.max(62, cleanWord(word).length * 13)}px` }} onFocus={() => setActiveBlank(i)} onChange={e => setAnswers({ ...answers, [i]: e.target.value })} onKeyDown={e => { if (e.key === "Enter" && !graded && allAnswered) { e.preventDefault(); setGraded(true); return; } if ((e.key === "Enter" || e.key === "Tab") && answers[i]?.trim()) { e.preventDefault(); setActiveBlank(nextBlank(i)); } }}/> : <span key={i}>{word} </span>)}</div></>}
     {mode === "impossible" && <div className="impossible-recall"><p>Write the entire verse from memory.</p><textarea autoFocus value={fullRecall} disabled={graded} onChange={event => setFullRecall(event.target.value)} placeholder="Begin typing the verse…" aria-label={`Write ${verse.reference} from memory`}/>{graded && <div className="recall-comparison"><span>Your answer</span><p>{recalledWords.map((word, i) => <mark className={impossibleResults[i] ? "correct" : "incorrect"} key={`${word}-${i}`}>{word} </mark>)}</p><span>Scripture</span><p>{verse.text}</p></div>}</div>}
     <span className="translation">{verse.translation}</span>
     {mode === "easy" && activeBlank !== null && !graded && <div className="choice-tray"><div className="choice-heading"><span>{blankIndexes.indexOf(activeBlank) + 1}</span><p>Choose the missing word</p></div><div>{choicesFor(activeBlank).map(choice => <button key={choice} onClick={() => { const updated = { ...answers, [activeBlank]: choice }; setAnswers(updated); const next = blankIndexes.find(i => i > activeBlank && !updated[i]) ?? blankIndexes.find(i => !updated[i]) ?? null; setActiveBlank(next); }}>{choice}</button>)}</div></div>}

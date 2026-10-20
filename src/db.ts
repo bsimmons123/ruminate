@@ -67,6 +67,17 @@ export async function saveItem(item: LibraryItem) {
   });
 }
 
+async function remove(store: string, id: string) {
+  const db = await openDb();
+  return new Promise<void>((resolve, reject) => {
+    const request = db.transaction(store, "readwrite").objectStore(store).delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export const removeReview = (id: string) => remove(REVIEWS, id);
+
 export async function removeItem(id: string) {
   const db = await openDb();
   return new Promise<void>((resolve, reject) => {

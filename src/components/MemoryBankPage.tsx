@@ -4,16 +4,18 @@ import type { LibraryItem, Verse } from "../types";
 
 export function MemoryBankPage({ items, verseFor, onQuiz, onLibrary, onUpdate }: {
   items: LibraryItem[];
-  verseFor: (id: string) => Verse;
+  verseFor: (id: string) => Verse | undefined;
   onQuiz: (items: LibraryItem[]) => void;
   onLibrary: () => void;
   onUpdate: (item: LibraryItem) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
-  const shown = items.filter(item => {
+  const shown = items.flatMap(item => {
     const verse = verseFor(item.verseId);
-    return `${verse.reference} ${verse.text} ${verse.translation}`.toLowerCase().includes(query.toLowerCase());
+    if (!verse) return [];
+    const haystack = `${verse.reference} ${verse.text} ${verse.translation}`.toLowerCase();
+    return haystack.includes(query.toLowerCase()) ? [[item, verse] as const] : [];
   });
   async function resumeLearning(item: LibraryItem) {
     try { await onUpdate({ ...item, memorized: false }); setError(""); }
@@ -25,8 +27,7 @@ export function MemoryBankPage({ items, verseFor, onQuiz, onLibrary, onUpdate }:
     {items.length ? <>
       <section className="memory-bank-quiz"><div><span className="overline">Recall without hints</span><h2>A fresh order, every time.</h2><p>Quiz yourself on your memorized verses in a random order. Each verse appears once per session, and your answers are saved to Progress.</p></div><button className="primary" onClick={() => onQuiz(items)}>Start random quiz <ArrowRight/></button></section>
       <label className="memory-bank-search"><Search size={18}/><input type="search" value={query} onChange={event => setQuery(event.target.value)} aria-label="Search memorized verses" placeholder="Search memorized verses"/></label>
-      <div className="memory-bank-grid">{shown.map(item => {
-        const verse = verseFor(item.verseId);
+      <div className="memory-bank-grid">{shown.map(([item, verse]) => {
         return <article key={verse.id}><span className="overline">Memorized · {verse.translation}</span><h2>{verse.reference}</h2><p>{verse.text}</p><div><button className="text-button" onClick={() => onQuiz([item])}>Quiz this verse <ArrowRight size={15}/></button><button className="memory-bank-resume" onClick={() => void resumeLearning(item)}>Move back to learning</button></div></article>;
       })}</div>
       {!shown.length && <p className="memory-bank-no-results">No memorized verses match your search.</p>}

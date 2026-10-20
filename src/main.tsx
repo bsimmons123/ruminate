@@ -7,6 +7,7 @@ import "./styles.css";
 import "./reels.css";
 import "./native.css";
 import { isNativeApp } from "./nativePush";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 if (isNativeApp) {
   document.documentElement.classList.add("native");
@@ -19,7 +20,13 @@ if (isNativeApp) {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);
+/* Signing out from the fallback has to clear storage directly: the boundary sits
+   above App, so the normal sign-out path is not available once a render has failed. */
+const escapeHatch = () => { localStorage.clear(); window.location.reload(); };
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode><ErrorBoundary onSignOut={escapeHatch}><App /></ErrorBoundary></React.StrictMode>
+);
 
 if (!isNativeApp && "serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
