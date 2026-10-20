@@ -138,7 +138,7 @@
   justify-content: center;
   gap: 3px;
   padding: 0 2px;
-  color: #7b8781;
+  color: var(--fg-grey-61);
   cursor: pointer;
 }
 .native .native-tabs button span {
@@ -150,7 +150,7 @@
   white-space: nowrap;
   max-width: 100%;
 }
-.native .native-tabs button.active { color: #8e5a47; }
+.native .native-tabs button.active { color: var(--fg-sand-51); }
 .native .native-tabs button:active { opacity: .55; }
 
 /* ---------- Sheets ---------- */
@@ -188,7 +188,7 @@
   width: 38px;
   height: 4px;
   border-radius: 2px;
-  background: #d4d0c5;
+  background: var(--bg-grey-85);
   margin: 2px auto 14px;
 }
 
@@ -199,7 +199,7 @@
   height: var(--touch);
   border: 0;
   border-radius: 50%;
-  background: #eeebe3;
+  background: var(--bg-grey-94);
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -207,11 +207,11 @@
 
 .native .sheet-account { padding: 4px 4px 16px; }
 .native .sheet-account strong { display: block; font: 400 22px "Gilda Display", serif; }
-.native .sheet-account span { font-size: 13px; color: #66736d; overflow-wrap: anywhere; }
+.native .sheet-account span { font-size: 13px; color: var(--fg-green-55); overflow-wrap: anywhere; }
 
 /* Grouped inset list, the iOS convention for a menu like this. */
 .native .sheet-list {
-  background: #f4f1e8;
+  background: var(--bg-grey-96);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -230,8 +230,8 @@
   border-bottom: 1px solid var(--line);
 }
 .native .sheet-list button:last-child { border-bottom: 0; }
-.native .sheet-list button:active { background: #eae6da; }
-.native .sheet-list svg { color: #7a8c80; flex: none; }
+.native .sheet-list button:active { background: var(--bg-grey-92); }
+.native .sheet-list svg { color: var(--fg-grey-61); flex: none; }
 
 .native .sheet-signout {
   width: 100%;
@@ -239,8 +239,8 @@
   margin-top: 14px;
   border: 0;
   border-radius: 12px;
-  background: #f6e7e3;
-  color: #985849;
+  background: var(--bg-grey-94c);
+  color: var(--fg-sand-53);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -248,7 +248,7 @@
   font-weight: 600;
   cursor: pointer;
 }
-.native .sheet-signout:active { background: #efdcd7; }
+.native .sheet-signout:active { background: var(--bg-sand-91); }
 .native .sheet-signout:disabled { opacity: .6; }
 
 /* The collection preview becomes a sheet rather than a centered desktop dialog. */
@@ -299,16 +299,16 @@
 }
 
 /* Hover states never un-stick on touch; :active is the honest equivalent. */
-.native .primary:hover { background: #d9a56b; }
-.native .primary:active { background: #c8924f; transform: scale(.985); }
-.native .word-blank:hover { background: #eee9df; }
+.native .primary:hover { background: var(--accent-fill); }
+.native .primary:active { background: var(--accent-fill-press); transform: scale(.985); }
+.native .word-blank:hover { background: var(--bg-grey-94); }
 .native .choice-tray button:hover,
-.native .choice-tray button:focus { border-color: #c9c0b2; background: var(--paper); transform: none; box-shadow: none; }
-.native .choice-tray button:active { border-color: #9b6750; background: #fff; transform: scale(.97); }
+.native .choice-tray button:focus { border-color: var(--line-grey-81); background: var(--paper); transform: none; box-shadow: none; }
+.native .choice-tray button:active { border-color: var(--line-sand-56); background: var(--bg-grey-100); transform: scale(.97); }
 .native .open-book:hover { background: rgba(24,42,35,.25); color: white; border-color: rgba(255,255,255,.5); }
-.native .open-book:active { background: #e0bd86; color: #263f36; border-color: #e0bd86; }
+.native .open-book:active { background: var(--accent-soft); color: var(--accent-soft-ink); border-color: var(--line-olive-82); }
 .native .ratings button:hover { border-color: transparent; }
-.native .ratings button:active { border-color: #9c7b64; background: #ebe5d9; }
+.native .ratings button:active { border-color: var(--line-sand-61); background: var(--bg-grey-92); }
 
 /* ---------- Touch targets ---------- */
 
@@ -433,8 +433,8 @@
   border-top: 1px solid rgba(255,255,255,.18);
 }
 .native .review-stats div { display: flex; flex-direction: column; gap: 2px; }
-.native .review-stats strong { font: 400 26px "Gilda Display", serif; color: #fff; }
-.native .review-stats span { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #bdc9c2; }
+.native .review-stats strong { font: 400 26px "Gilda Display", serif; color: var(--fg-grey-100); }
+.native .review-stats span { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-grey-82); }
 
 /* Glanceable instead of three stacked blocks. */
 .native .verse-strip {
@@ -492,7 +492,7 @@
   max-width: none;
   margin: 0;
   border: 0;
-  border-top: 1px solid #d7c6ad;
+  border-top: 1px solid var(--line-olive-83);
   border-radius: 14px 14px 0 0;
   padding: 16px max(14px, var(--safe-left)) calc(14px + var(--safe-bottom)) max(14px, var(--safe-right));
   box-shadow: 0 -10px 30px rgba(54,61,53,.14);
@@ -519,7 +519,7 @@
   min-width: 86px;
   padding: 8px 10px;
   border-radius: 8px;
-  color: #fff;
+  color: var(--fg-grey-100);
 }
 .native .reels-controls { gap: 10px; }
 .native .reel-mode button { min-height: 38px; }
@@ -578,18 +578,18 @@
   height: 30px;
   flex: none;
   border-radius: 15px;
-  background: #d6d3c9;
+  background: var(--bg-grey-87);
   position: relative;
   transition: background .2s ease;
 }
-.native .toggle-line input[type="checkbox"]:checked { background: #5c8169; }
+.native .toggle-line input[type="checkbox"]:checked { background: var(--bg-green-57); }
 .native .toggle-line input[type="checkbox"]::after {
   content: "";
   position: absolute;
   top: 3px; left: 3px;
   width: 24px; height: 24px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--bg-grey-100);
   box-shadow: 0 1px 3px rgba(0,0,0,.25);
   transition: transform .2s ease;
 }
@@ -610,7 +610,7 @@
 
 /* ---------- Account deletion ---------- */
 
-.native .danger-zone { margin-top: 4px; padding: 20px; border: 1px solid #e3cdc6; border-radius: 12px; background: var(--paper); }
+.native .danger-zone { margin-top: 4px; padding: 20px; border: 1px solid var(--line-sand-86); border-radius: 12px; background: var(--paper); }
 .native .danger-zone h2 { font-size: 21px; }
 .native .danger-button { width: 100%; min-height: 52px; border-radius: 10px; justify-content: center; }
 .native .danger-confirm input { height: 52px; border-radius: 10px; font-size: 16px; }

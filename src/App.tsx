@@ -17,7 +17,7 @@ import NativeShell, { tap } from "./components/NativeShell";
 import { TermsPage } from "./components/TermsPage";
 import { PrivacyPage } from "./components/PrivacyPage";
 import { ImpactStyle } from "@capacitor/haptics";
-import type { CommunityCollection, LibraryItem, ReviewRating, ReviewResult, Translation, User, UserSettings, Verse } from "./types";
+import type { CommunityCollection, LibraryItem, ReviewRating, ReviewResult, Theme, Translation, User, UserSettings, Verse } from "./types";
 
 type Page = "home" | "reels" | "store" | "library" | "memory-bank" | "history" | "settings" | "review" | "terms" | "privacy";
 type ExerciseSummary = Pick<ReviewResult, "mode" | "correct" | "total" | "percentage" | "answers">;
@@ -63,6 +63,26 @@ function App() {
   const [sessionKind, setSessionKind] = useState<"review" | "quiz">("review");
   const startReviewRef = useRef<() => void>(() => {});
   const [reviewReturn, setReviewReturn] = useState<Page>("home");
+  /* Settings previews a theme as soon as it is tapped; the saved value takes over
+     again when the page is left without saving. */
+  const [themePreview, setThemePreview] = useState<Theme | null>(null);
+  const theme: Theme = themePreview ?? settings?.theme ?? "system";
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "system") delete root.dataset.theme; else root.dataset.theme = theme;
+    /* The status bar and PWA chrome read this, so it has to track the resolved
+       theme rather than the preference. */
+    const dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#121715" : "#24493c");
+  }, [theme]);
+  useEffect(() => {
+    if (theme !== "system") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const sync = () => document.querySelector('meta[name="theme-color"]')?.setAttribute("content", media.matches ? "#121715" : "#24493c");
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, [theme]);
+
   // Keep the address bar truthful for the two pages that have addresses.
   useEffect(() => {
     if (isNativeApp) return;
@@ -87,7 +107,7 @@ function App() {
       }
       setUser(activeUser);
       if (!activeUser) { setReady(true); return; }
-      if (activeUser) { const saved = savedSettings.find(value => value.userId === activeUser.id); setUserSettings(saved ? { ...saved, translation: normalizeTranslation(saved.translation) } : { userId: activeUser.id, translation: DEFAULT_TRANSLATION, dailyGoal: 5, theme: "light", reminders: false }); }
+      if (activeUser) { const saved = savedSettings.find(value => value.userId === activeUser.id); setUserSettings(saved ? { ...saved, translation: normalizeTranslation(saved.translation) } : { userId: activeUser.id, translation: DEFAULT_TRANSLATION, dailyGoal: 5, theme: "system", reminders: false }); }
       setCatalog([...verses, ...customPassages.filter(custom => !verses.some(seed => seed.id === custom.id))]);
       setHistory(pastReviews.sort((a, b) => b.reviewedAt.localeCompare(a.reviewedAt)));
       if (!items.length) {
@@ -213,7 +233,7 @@ function App() {
   /* Honour the spaced-repetition schedule: practise what is due, and when nothing is
      due offer a fresh, shuffled set rather than the same list in the same order. */
   function startReview(from: Page = "home") {
-    setSessionIds(buildReviewQueue(library, history).verseIds);
+    setSessionIds(buildReviewQueue(library, history, { limit: settings?.dailyGoal }).verseIds);
     setSessionKind("review");
     setReviewIndex(0);
     setReviewReturn(from);
@@ -223,6 +243,7 @@ function App() {
   startReviewRef.current = () => startReview("home");
 
   function navigate(next: Page) {
+    setThemePreview(null);
     if (next === "review") { startReview("home"); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     setPage(next); setMenu(false); window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -243,13 +264,13 @@ function App() {
     const [savedLibrary, savedPassages, savedReviews, savedPreferences] = await Promise.all([apiItems<LibraryItem>("library"), apiItems<Verse>("passage"), apiItems<ReviewResult>("review"), apiItems<UserSettings>("settings")]);
     let nextLibrary = savedLibrary;
     if (!nextLibrary.length) { nextLibrary = starterIds.map((verseId, index) => ({ verseId, addedAt: new Date().toISOString(), stage: 1, reviews: index, nextReview: new Date().toISOString(), collection: index === 0 ? "Peace & Rest" : "My Verses" })); await Promise.all(nextLibrary.map(item => apiPut("library", item.verseId, item))); }
-    const defaults: UserSettings = { userId: activeUser.id, translation: DEFAULT_TRANSLATION, dailyGoal: 5, theme: "light", reminders: false };
+    const defaults: UserSettings = { userId: activeUser.id, translation: DEFAULT_TRANSLATION, dailyGoal: 5, theme: "system", reminders: false };
     setLibrary(nextLibrary); setCatalog([...verses, ...savedPassages]); setHistory(savedReviews.sort((a,b) => b.reviewedAt.localeCompare(a.reviewedAt))); setUserSettings(savedPreferences[0] ? { ...savedPreferences[0], translation: normalizeTranslation(savedPreferences[0].translation) } : defaults);
     if (!savedPreferences[0]) await apiPut("settings", "preferences", defaults);
     setUser(activeUser); setPage("home");
   }} />;
 
-  async function updateSettings(next: UserSettings) { if (isNativeApp && next.reminders && online && connection.mode === "online" && !await enablePush()) { notify("Could not enable reminders. Check notification permission and connection."); return; } if (isNativeApp && !next.reminders && settings?.reminders) await disablePush(); if (serverEnabled) await apiPut("settings", "preferences", next); else await saveSettings(next); setUserSettings(next); notify("Settings saved"); }
+  async function updateSettings(next: UserSettings) { if (isNativeApp && next.reminders && online && connection.mode === "online" && !await enablePush()) { notify("Could not enable reminders. Check notification permission and connection."); return; } if (isNativeApp && !next.reminders && settings?.reminders) await disablePush(); if (serverEnabled) await apiPut("settings", "preferences", next); else await saveSettings(next); setUserSettings(next); setThemePreview(null); notify("Settings saved"); }
   async function signOut() {
     if (signingOut) return;
     setSigningOut(true);
@@ -304,7 +325,7 @@ function App() {
       </header>}
 
       <main>
-        {page === "home" && <HomePage due={due.length} streak={streak} library={library} verseFor={verseFor} onReview={() => navigate("review")} onStore={() => navigate("store")} />}
+        {page === "home" && <HomePage due={due.length} goal={settings?.dailyGoal ?? 0} streak={streak} library={library} verseFor={verseFor} onReview={() => navigate("review")} onStore={() => navigate("store")} />}
         {page === "reels" && <ReelsPage catalog={catalog} library={library} translation={settings?.translation || DEFAULT_TRANSLATION} onBack={() => navigate("home")} onPin={toggleVerse} onImport={importVerse} />}
         {page === "store" && <StorePage filtered={filtered} topics={topics} topic={topic} query={query} library={library} preferredTranslation={settings?.translation || DEFAULT_TRANSLATION} onQuery={setQuery} onTopic={setTopic} onToggle={toggleVerse} onCollection={addCollection} onImport={importVerse} />}
         {page === "library" && <LibraryPage library={library} verseFor={verseFor} onRemove={toggleVerse} onUpdate={updateLibraryItem} onReview={() => navigate("review")} onStore={() => navigate("store")} />}
@@ -312,7 +333,7 @@ function App() {
         {page === "history" && <HistoryPage history={history} verseFor={verseFor} />}
         {page === "terms" && <TermsPage onBack={() => navigate("home")} />}
         {page === "privacy" && <PrivacyPage onBack={() => navigate("home")} />}
-        {page === "settings" && settings && <SettingsPage user={user} settings={settings} onSave={updateSettings} onSignOut={signOut} signingOut={signingOut} onDeleteAccount={deleteAccount} />}
+        {page === "settings" && settings && <SettingsPage user={user} settings={settings} onSave={updateSettings} onSignOut={signOut} signingOut={signingOut} onDeleteAccount={deleteAccount} onPreviewTheme={setThemePreview} />}
         {page === "review" && <ReviewPage key={reviewItems[reviewIndex]?.verseId} items={reviewItems} index={reviewIndex} verse={reviewItems[reviewIndex] ? verseFor(reviewItems[reviewIndex].verseId) : undefined} onRate={rate} onClose={() => navigate(reviewReturn)} initialMode={sessionKind === "quiz" ? "impossible" : "easy"} />}
       </main>
       {page !== "reels" && <div className="esv-global"><strong>Noncommercial Scripture-memory project</strong><p>Scripture quotations marked “ESV” are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved. The ESV text may not be quoted in any publication made available to the public by a Creative Commons license. The ESV may not be translated into any other language.</p><p>Users may not copy or download more than 500 verses of the ESV Bible or more than one half of any book of the ESV Bible.</p><a href="https://www.esv.org/" target="_blank" rel="noreferrer">Read at ESV.org</a><button className="legal-link" onClick={() => navigate("terms")}>Terms of Service</button><button className="legal-link" onClick={() => navigate("privacy")}>Privacy Policy</button></div>}
@@ -346,7 +367,7 @@ function AuthPage({ onAuthenticated, onReadOffline, onTerms, onPrivacy }: { onRe
         if (users.length) throw new Error("This device already has a Ruminate profile. Sign in to continue.");
         if (users.some(user => user.email === normalizedEmail)) throw new Error("An account with that email already exists on this device.");
         const user: User = { id: crypto.randomUUID(), name: name.trim(), email: normalizedEmail, passwordHash, createdAt: new Date().toISOString() };
-        await saveUser(user); await saveSettings({ userId: user.id, translation: DEFAULT_TRANSLATION, dailyGoal: 5, theme: "light", reminders: false }); await onAuthenticated(user);
+        await saveUser(user); await saveSettings({ userId: user.id, translation: DEFAULT_TRANSLATION, dailyGoal: 5, theme: "system", reminders: false }); await onAuthenticated(user);
       } else {
         const user = users.find(candidate => candidate.email === normalizedEmail && candidate.passwordHash === passwordHash);
         if (!user) throw new Error("That email and password combination wasn’t found."); await onAuthenticated(user);
@@ -543,9 +564,9 @@ function BookVerseReels({ book, translation, pinned, onBack, onPin, readOnly = f
   return <div className="verse-reels-shell"><button className="back-to-books" onClick={onBack}><ArrowLeft/> All books</button><div ref={feedRef} className="reel-feed verse-book-feed" tabIndex={0} onScroll={event => { const element = event.currentTarget; const nextActive = Math.max(0, Math.min(bookVerses.length - 1, Math.round(element.scrollTop / element.clientHeight))); setActive(nextActive); bookAnchor.current = bookVerses[nextActive]?.reference || bookAnchor.current; if (nextActive >= bookVerses.length - 3) void loadMoreEsv(); }}><div className="reel-spacer" style={{ height: first * viewportHeight }} aria-hidden="true"/>{bookVerses.slice(first, last).map((verse, offset) => { const i = first + offset; return <article className={`reel book-verse reel-${Math.floor((verse.chapter - 1) / 2) % 4}`} key={verse.id}><div className="chapter-watermark">{verse.chapter}</div><div className="reel-content"><span>{book} · Chapter {verse.chapter}</span><blockquote>“{verse.text}”</blockquote><p>{verse.reference} <i>{translation}</i></p></div>{!readOnly && <button className={pinned.has(verse.id) ? "pinned" : ""} onClick={() => onPin(verse)}><Bookmark/>{pinned.has(verse.id) ? "Pinned" : "Pin to memorize"}</button>}{translation === "ESV" && <small>ESV® © 2001 Crossway. Used by permission.</small>}<div className="verse-sequence">Verse {i + 1}{translation === "ESV" && esvSource.current.length ? "+" : ` of ${bookVerses.length}`}</div>{i === 0 && <div className="swipe-prompt"><ArrowUp/> Swipe or scroll <ArrowDown/></div>}</article>; })}<div className="reel-spacer" style={{ height: (bookVerses.length - last) * viewportHeight }} aria-hidden="true"/></div><div className="reel-nav"><button onClick={() => move(-1)} disabled={active === 0} aria-label="Previous verse"><ArrowUp/></button><span>{active + 1}<i/> {bookVerses.length}{translation === "ESV" && esvSource.current.length ? "+" : ""}</span><button onClick={() => move(1)} disabled={active === bookVerses.length - 1 && !esvSource.current.length} aria-label="Next verse"><ArrowDown/></button></div></div>;
 }
 
-function SettingsPage({ user, settings, onSave, onSignOut, signingOut, onDeleteAccount }: { user: User; settings: UserSettings; onSave: (value: UserSettings) => void; onSignOut: () => void; signingOut: boolean; onDeleteAccount: () => Promise<void> }) {
+function SettingsPage({ user, settings, onSave, onSignOut, signingOut, onDeleteAccount, onPreviewTheme }: { user: User; settings: UserSettings; onSave: (value: UserSettings) => void; onSignOut: () => void; signingOut: boolean; onDeleteAccount: () => Promise<void>; onPreviewTheme: (theme: Theme) => void }) {
   const [draft, setDraft] = useState(settings);
-  return <div className="page settings-page"><section className="page-title"><p className="eyebrow">Your Ruminate</p><h1>Settings</h1><p>Shape a practice that fits your life.</p></section><div className="settings-layout"><aside><div className="settings-avatar">{user.name.split(" ").map(p => p[0]).join("").slice(0,2)}</div><h2>{user.name}</h2><p>{user.email}</p><span><UserRound/> Your account</span></aside><section className="settings-panel"><div><span className="overline">Scripture</span><h2>Reading preferences</h2><TranslationSelect value={draft.translation} onChange={translation => setDraft({ ...draft, translation })}/><small>This preference is the default everywhere Scripture is shown. You can still switch versions while reading.</small></div><div><span className="overline">Practice</span><h2>Daily rhythm</h2><label>Daily verse goal<input type="number" min="1" max="50" value={draft.dailyGoal} onChange={e => setDraft({ ...draft, dailyGoal: Number(e.target.value) })}/></label><label className="toggle-line"><span>Daily reminders<small>{isNativeApp ? "A push reminder at 9 a.m. when a verse is due." : "Managed in the Android and iOS app."}</small></span><input type="checkbox" disabled={!isNativeApp} checked={draft.reminders} onChange={e => setDraft({ ...draft, reminders: e.target.checked })}/></label></div>{!isNativeApp && <div><span className="overline">Mobile app</span><h2>Install Ruminate</h2><p className="install-copy">Add Ruminate to your home screen for a full-screen, app-like experience.</p><InstallAppButton/></div>}<button className="primary" onClick={() => onSave(draft)}>Save preferences <Check/></button></section></div><button className="signout" disabled={signingOut} onClick={onSignOut}><LogOut/> {signingOut ? "Signing out…" : "Sign out on this device"}</button><DeleteAccountSection email={user.email} onDelete={onDeleteAccount}/></div>;
+  return <div className="page settings-page"><section className="page-title"><p className="eyebrow">Your Ruminate</p><h1>Settings</h1><p>Shape a practice that fits your life.</p></section><div className="settings-layout"><aside><div className="settings-avatar">{user.name.split(" ").map(p => p[0]).join("").slice(0,2)}</div><h2>{user.name}</h2><p>{user.email}</p><span><UserRound/> Your account</span></aside><section className="settings-panel"><div><span className="overline">Scripture</span><h2>Reading preferences</h2><TranslationSelect value={draft.translation} onChange={translation => setDraft({ ...draft, translation })}/><small>This preference is the default everywhere Scripture is shown. You can still switch versions while reading.</small></div><div><span className="overline">Practice</span><h2>Daily rhythm</h2><label>Daily verse goal<input type="number" min="1" max="50" value={draft.dailyGoal} onChange={e => setDraft({ ...draft, dailyGoal: Number(e.target.value) })}/></label><label className="toggle-line"><span>Daily reminders<small>{isNativeApp ? "A push reminder at 9 a.m. when a verse is due." : "Managed in the Android and iOS app."}</small></span><input type="checkbox" disabled={!isNativeApp} checked={draft.reminders} onChange={e => setDraft({ ...draft, reminders: e.target.checked })}/></label></div><div><span className="overline">Appearance</span><h2>Theme</h2><div className="theme-switch" role="group" aria-label="Theme"><button type="button" className={draft.theme === "light" ? "active" : ""} aria-pressed={draft.theme === "light"} onClick={() => { setDraft({ ...draft, theme: "light" }); onPreviewTheme("light"); }}>Light</button><button type="button" className={draft.theme === "dark" ? "active" : ""} aria-pressed={draft.theme === "dark"} onClick={() => { setDraft({ ...draft, theme: "dark" }); onPreviewTheme("dark"); }}>Dark</button><button type="button" className={draft.theme === "system" ? "active" : ""} aria-pressed={draft.theme === "system"} onClick={() => { setDraft({ ...draft, theme: "system" }); onPreviewTheme("system"); }}>Match system</button></div><small>Dark keeps the same palette with its lightness flipped, so Scripture reads the same way at night. Changes preview straight away and stick when you save.</small></div>{!isNativeApp && <div><span className="overline">Mobile app</span><h2>Install Ruminate</h2><p className="install-copy">Add Ruminate to your home screen for a full-screen, app-like experience.</p><InstallAppButton/></div>}<button className="primary" onClick={() => onSave(draft)}>Save preferences <Check/></button></section></div><button className="signout" disabled={signingOut} onClick={onSignOut}><LogOut/> {signingOut ? "Signing out…" : "Sign out on this device"}</button><DeleteAccountSection email={user.email} onDelete={onDeleteAccount}/></div>;
 }
 
 /* Account deletion is required to be reachable in-app (App Store guideline 5.1.1(v)),
@@ -631,12 +652,12 @@ function InstallAppButton() {
   return <button className="install-button" onClick={async () => { await prompt.prompt(); const choice = await prompt.userChoice; if (choice.outcome === "accepted") setInstalled(true); setPrompt(null); }}><Download/> Install Ruminate</button>;
 }
 
-function HomePage({ due, streak, library, verseFor, onReview, onStore }: { due: number; streak: number; library: LibraryItem[]; verseFor: (id: string) => Verse; onReview: () => void; onStore: () => void }) {
+function HomePage({ due, goal, streak, library, verseFor, onReview, onStore }: { due: number; goal: number; streak: number; library: LibraryItem[]; verseFor: (id: string) => Verse; onReview: () => void; onStore: () => void }) {
   const today = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
   return <div className="page home-page">
     <InstallBanner/>
     <section className="welcome"><div><p className="eyebrow">{today}</p><h1>Good morning.</h1><p>Make a little room for the Word today.</p><span className="mobile-streak"><Flame/> {streak}-day streak</span></div><div className="sun-ornament">✦</div></section>
-    <section className="review-card"><div className="review-copy"><span className="overline"><Sparkles size={15} /> Today’s practice</span><h2>{due ? `${due} ${due === 1 ? "verse is" : "verses are"} ready for you` : "You are caught up for now"}</h2><p>{due ? "A few quiet minutes now can keep these words close all day." : "Nothing is scheduled yet. Keep going and we will draw from the verses you have not practised today."}</p>{isNativeApp && <div className="review-stats"><div><strong>{due}</strong><span>Due</span></div><div><strong>{library.length}</strong><span>In library</span></div><div><strong>{streak}</strong><span>Day streak</span></div></div>}<button className="primary" onClick={onReview}>{due ? "Begin review" : "Practise anyway"} <ArrowRight size={18} /></button></div><div className="progress-ring"><svg viewBox="0 0 100 100"><circle className="track" cx="50" cy="50" r="42"/><circle className="fill" cx="50" cy="50" r="42"/></svg><strong>{due}</strong><span>due</span></div></section>
+    <section className="review-card"><div className="review-copy"><span className="overline"><Sparkles size={15} /> Today’s practice</span><h2>{due ? `${due} ${due === 1 ? "verse is" : "verses are"} ready for you` : "You are caught up for now"}</h2><p>{!due ? "Nothing is scheduled yet. Keep going and we will draw from the verses you have not practised today." : goal > 0 && due > goal ? `This session covers the ${goal} most overdue, your daily goal. The rest stay due.` : "A few quiet minutes now can keep these words close all day."}</p>{isNativeApp && <div className="review-stats"><div><strong>{due}</strong><span>Due</span></div><div><strong>{library.length}</strong><span>In library</span></div><div><strong>{streak}</strong><span>Day streak</span></div></div>}<button className="primary" onClick={onReview}>{due ? "Begin review" : "Practise anyway"} <ArrowRight size={18} /></button></div><div className="progress-ring"><svg viewBox="0 0 100 100"><circle className="track" cx="50" cy="50" r="42"/><circle className="fill" cx="50" cy="50" r="42"/></svg><strong>{due}</strong><span>due</span></div></section>
     <div className="section-heading"><div><span className="overline">Continue learning</span><h2>Your verses</h2></div><button className="text-button" onClick={onStore}>Explore store <ArrowRight size={16}/></button></div>
     <div className="verse-strip">{library.slice(0, 3).map((item, i) => { const v = verseFor(item.verseId); return <article className="mini-verse" key={v.id}><span className="count">0{i + 1}</span><p>“{v.text.length > 115 ? v.text.slice(0, 115) + "…" : v.text}”</p><div><strong>{v.reference}</strong><span>{item.reviews ? `${item.reviews} reviews` : "New"}</span></div></article> })}</div>
     <section className="daily-verse"><div className="leaf">❧</div><span className="overline">Verse for today</span><blockquote>“Thy word is a lamp unto my feet,<br/>and a light unto my path.”</blockquote><p>Psalm 119:105 <i>KJV</i></p></section>

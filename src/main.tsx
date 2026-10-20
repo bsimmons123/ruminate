@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
 import App from "./App";
+import "./theme.css";
 import "./styles.css";
 import "./reels.css";
 import "./native.css";

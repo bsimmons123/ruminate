@@ -27,7 +27,8 @@ export type ReviewRating = "again" | "hard" | "good" | "easy";
 
 export type User = { id: string; name: string; email: string; passwordHash?: string; createdAt: string };
 export type Translation = "KJV" | "ESV" | "ASV" | "WEB" | "YLT";
-export type UserSettings = { userId: string; translation: Translation; dailyGoal: number; theme: "light" | "system"; reminders: boolean };
+export type Theme = "light" | "dark" | "system";
+export type UserSettings = { userId: string; translation: Translation; dailyGoal: number; theme: Theme; reminders: boolean };
 
 export type ReviewResult = {
   id: string;
