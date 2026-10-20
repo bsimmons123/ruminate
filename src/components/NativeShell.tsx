@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Home, Sparkles, Library, BookHeart, Menu, BookOpen, TrendingUp, Settings, LogOut, X } from "lucide-react";
+import { Home, Sparkles, Library, BookHeart, Menu, BookOpen, TrendingUp, Settings, FileText, ShieldCheck, LogOut, X } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { Capacitor } from "@capacitor/core";
 
 /** Pages reachable from the tab bar. Everything else lives in the More sheet. */
-export type ShellPage = "home" | "reels" | "store" | "library" | "memory-bank" | "history" | "settings" | "review";
+export type ShellPage = "home" | "reels" | "store" | "library" | "memory-bank" | "history" | "settings" | "review" | "terms" | "privacy";
 
 const tabs = [
   { page: "home", label: "Today", Icon: Home },
@@ -22,6 +22,8 @@ const titles: Record<ShellPage, string> = {
   history: "Progress",
   settings: "Settings",
   review: "Review",
+  terms: "Terms of Service",
+  privacy: "Privacy Policy",
 };
 
 /** No-op off native so the web never reaches for the vibration API. */
@@ -140,6 +142,8 @@ export default function NativeShell({ page, user, signingOut, onNavigate, onSign
               <button onClick={() => fromSheet("store")}><BookOpen size={19} /> Verse Store</button>
               <button onClick={() => fromSheet("history")}><TrendingUp size={19} /> Progress</button>
               <button onClick={() => fromSheet("settings")}><Settings size={19} /> Settings</button>
+              <button onClick={() => fromSheet("terms")}><FileText size={19} /> Terms of Service</button>
+              <button onClick={() => fromSheet("privacy")}><ShieldCheck size={19} /> Privacy Policy</button>
             </div>
             <button className="sheet-signout" disabled={signingOut} onClick={signOutFromSheet}>
               <LogOut size={18} /> {signingOut ? "Signing out…" : "Sign out"}

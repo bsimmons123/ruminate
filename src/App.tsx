@@ -13,10 +13,12 @@ import { App as NativeApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { MemoryBankPage } from "./components/MemoryBankPage";
 import NativeShell, { tap } from "./components/NativeShell";
+import { TermsPage } from "./components/TermsPage";
+import { PrivacyPage } from "./components/PrivacyPage";
 import { ImpactStyle } from "@capacitor/haptics";
 import type { CommunityCollection, LibraryItem, ReviewRating, ReviewResult, Translation, User, UserSettings, Verse } from "./types";
 
-type Page = "home" | "reels" | "store" | "library" | "memory-bank" | "history" | "settings" | "review";
+type Page = "home" | "reels" | "store" | "library" | "memory-bank" | "history" | "settings" | "review" | "terms" | "privacy";
 type ExerciseSummary = Pick<ReviewResult, "mode" | "correct" | "total" | "percentage" | "answers">;
 
 const starterIds = ["ps-46-10", "prov-3-5-6", "john-3-16"];
@@ -35,7 +37,12 @@ function reviewStreak(results: ReviewResult[]) {
 }
 
 function App() {
-  const [page, setPage] = useState<Page>("home");
+  /* The legal pages are the only routes with real URLs. Apple requires a publicly
+     reachable privacy policy link, and a state-only SPA has none to offer. */
+  const [page, setPage] = useState<Page>(() => {
+    const path = window.location.pathname.replace(/\/+$/, "");
+    return path === "/privacy" ? "privacy" : path === "/terms" ? "terms" : "home";
+  });
   const currentPage = useRef<Page>("home");
   const [library, setLibrary] = useState<LibraryItem[]>([]);
   const [catalog, setCatalog] = useState<Verse[]>(verses);
@@ -52,6 +59,14 @@ function App() {
   const [reviewIndex, setReviewIndex] = useState(0);
   const [quizIds, setQuizIds] = useState<string[] | null>(null);
   const [reviewReturn, setReviewReturn] = useState<Page>("home");
+  // Keep the address bar truthful for the two pages that have addresses.
+  useEffect(() => {
+    if (isNativeApp) return;
+    const path = page === "privacy" ? "/privacy" : page === "terms" ? "/terms" : "/";
+    const current = window.location.pathname.replace(/\/+$/, "") || "/";
+    const legal = current === "/privacy" || current === "/terms";
+    if (current !== path && (legal || path !== "/")) window.history.replaceState(null, "", path);
+  }, [page]);
   const [menu, setMenu] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
@@ -204,7 +219,10 @@ function App() {
   if (offlineReader) return <ReelsPage catalog={[]} library={[]} translation="WEB" readOnly onBack={() => setOfflineReader(false)} onPin={() => {}} onImport={async () => {}} />;
   if (!ready) return <div className="loading"><span>Ruminate</span><i /><button className="offline-reading" onClick={() => setOfflineReader(true)}>Read Bible offline</button></div>;
   if (startupError) return <main className="empty"><BookOpen/><h1>Could not open Ruminate</h1><p>{startupError}</p><button className="primary" onClick={() => window.location.reload()}>Try again</button><button className="offline-reading" onClick={() => setOfflineReader(true)}>Read Bible offline</button></main>;
-  if (!user) return <AuthPage onReadOffline={() => setOfflineReader(true)} onAuthenticated={async activeUser => {
+  // Terms must be readable before signing up, since that is when people agree to them.
+  if (!user && page === "terms") return <TermsPage onBack={() => setPage("home")} />;
+  if (!user && page === "privacy") return <PrivacyPage onBack={() => setPage("home")} />;
+  if (!user) return <AuthPage onTerms={() => setPage("terms")} onPrivacy={() => setPage("privacy")} onReadOffline={() => setOfflineReader(true)} onAuthenticated={async activeUser => {
     localStorage.setItem(SESSION_KEY, activeUser.id);
     const [savedLibrary, savedPassages, savedReviews, savedPreferences] = await Promise.all([apiItems<LibraryItem>("library"), apiItems<Verse>("passage"), apiItems<ReviewResult>("review"), apiItems<UserSettings>("settings")]);
     let nextLibrary = savedLibrary;
@@ -276,10 +294,12 @@ function App() {
         {page === "library" && <LibraryPage library={library} verseFor={verseFor} onRemove={toggleVerse} onUpdate={updateLibraryItem} onReview={() => navigate("review")} onStore={() => navigate("store")} />}
         {page === "memory-bank" && <MemoryBankPage items={memorizedItems} verseFor={verseFor} onQuiz={startMemoryQuiz} onLibrary={() => navigate("library")} onUpdate={updateLibraryItem} />}
         {page === "history" && <HistoryPage history={history} verseFor={verseFor} />}
+        {page === "terms" && <TermsPage onBack={() => navigate("home")} />}
+        {page === "privacy" && <PrivacyPage onBack={() => navigate("home")} />}
         {page === "settings" && settings && <SettingsPage user={user} settings={settings} onSave={updateSettings} onSignOut={signOut} signingOut={signingOut} onDeleteAccount={deleteAccount} />}
         {page === "review" && <ReviewPage key={reviewItems[reviewIndex]?.verseId} items={reviewItems} index={reviewIndex} verse={reviewItems[reviewIndex] ? verseFor(reviewItems[reviewIndex].verseId) : undefined} onRate={rate} onClose={() => navigate(reviewReturn)} initialMode={quizIds ? "impossible" : "easy"} />}
       </main>
-      {page !== "reels" && <div className="esv-global"><strong>Noncommercial Scripture-memory project</strong><p>Scripture quotations marked “ESV” are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved. The ESV text may not be quoted in any publication made available to the public by a Creative Commons license. The ESV may not be translated into any other language.</p><p>Users may not copy or download more than 500 verses of the ESV Bible or more than one half of any book of the ESV Bible.</p><a href="https://www.esv.org/" target="_blank" rel="noreferrer">Read at ESV.org</a></div>}
+      {page !== "reels" && <div className="esv-global"><strong>Noncommercial Scripture-memory project</strong><p>Scripture quotations marked “ESV” are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved. The ESV text may not be quoted in any publication made available to the public by a Creative Commons license. The ESV may not be translated into any other language.</p><p>Users may not copy or download more than 500 verses of the ESV Bible or more than one half of any book of the ESV Bible.</p><a href="https://www.esv.org/" target="_blank" rel="noreferrer">Read at ESV.org</a><button className="legal-link" onClick={() => navigate("terms")}>Terms of Service</button><button className="legal-link" onClick={() => navigate("privacy")}>Privacy Policy</button></div>}
       {(!online || connection.mode !== "online" || connection.pending > 0) && <div className="offline-badge" role="status"><WifiOff/>{connection.mode === "syncing" ? "Syncing saved practice…" : `Saved on this device${connection.pending ? ` · ${connection.pending} updates waiting to sync` : " · Offline access"}`}</div>}
 
       {!isNativeApp && page !== "review" && page !== "reels" && <nav className="mobile-tabs"><button className={page === "home" ? "active" : ""} onClick={() => navigate("home")}><Home />Today</button><button onClick={() => navigate("reels")}><Sparkles />Reels</button><button className={page === "store" ? "active" : ""} onClick={() => navigate("store")}><BookOpen />Store</button><button className={page === "library" ? "active" : ""} onClick={() => navigate("library")}><Library />Library</button><button className={page === "memory-bank" ? "active" : ""} onClick={() => navigate("memory-bank")}><BookHeart />Memory Bank</button></nav>}
@@ -292,7 +312,7 @@ function App() {
     : <div className="app-shell">{content}</div>;
 }
 
-function AuthPage({ onAuthenticated, onReadOffline }: { onReadOffline: () => void; onAuthenticated: (user: User) => void | Promise<void> }) {
+function AuthPage({ onAuthenticated, onReadOffline, onTerms, onPrivacy }: { onReadOffline: () => void; onTerms: () => void; onPrivacy: () => void; onAuthenticated: (user: User) => void | Promise<void> }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
   const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
@@ -317,7 +337,7 @@ function AuthPage({ onAuthenticated, onReadOffline }: { onReadOffline: () => voi
       }
     } catch (err) { setError(err instanceof Error ? err.message : "Authentication failed"); } finally { setBusy(false); }
   }
-  return <main className="auth-page"><section className="auth-story"><div className="brand auth-brand"><span className="brand-mark">R</span><span>Ruminate<small>scripture memory</small></span></div><div><span className="overline">Keep the Word close</span><blockquote>“Thy word have I hid in mine heart, that I might not sin against thee.”</blockquote><p>Psalm 119:11</p></div></section><section className="auth-form"><div><p className="eyebrow">Welcome to Ruminate</p><h1>{mode === "signin" ? "Return to your practice." : "Begin your practice."}</h1><p>{mode === "signin" ? "Sign in to continue where you left off." : "Create your secure, synchronized account."}</p><form onSubmit={submit}>{mode === "signup" && <label>Your name<input value={name} onChange={e => setName(e.target.value)} autoComplete="name" required/></label>}<label>Email address<input type="email" {...(isNativeApp ? { inputMode: "email" as const, autoCapitalize: "none", autoCorrect: "off", spellCheck: false, enterKeyHint: "next" as const } : {})} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required/></label><label>Password<input type="password" minLength={8} {...(isNativeApp ? { enterKeyHint: "go" as const } : {})} value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === "signin" ? "current-password" : "new-password"} required/></label>{error && <p className="auth-error">{error}</p>}<button className="primary" disabled={busy}>{busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}<ArrowRight/></button></form><button className="auth-toggle" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }}>{mode === "signin" ? "New here? Create an account" : "Already have an account? Sign in"}</button><button className="offline-reading" onClick={onReadOffline}><BookOpen size={16}/> Read Bible offline</button><small className="local-note">Your practice is saved to your account.</small></div></section></main>;
+  return <main className="auth-page"><section className="auth-story"><div className="brand auth-brand"><span className="brand-mark">R</span><span>Ruminate<small>scripture memory</small></span></div><div><span className="overline">Keep the Word close</span><blockquote>“Thy word have I hid in mine heart, that I might not sin against thee.”</blockquote><p>Psalm 119:11</p></div></section><section className="auth-form"><div><p className="eyebrow">Welcome to Ruminate</p><h1>{mode === "signin" ? "Return to your practice." : "Begin your practice."}</h1><p>{mode === "signin" ? "Sign in to continue where you left off." : "Create your secure, synchronized account."}</p><form onSubmit={submit}>{mode === "signup" && <label>Your name<input value={name} onChange={e => setName(e.target.value)} autoComplete="name" required/></label>}<label>Email address<input type="email" {...(isNativeApp ? { inputMode: "email" as const, autoCapitalize: "none", autoCorrect: "off", spellCheck: false, enterKeyHint: "next" as const } : {})} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required/></label><label>Password<input type="password" minLength={8} {...(isNativeApp ? { enterKeyHint: "go" as const } : {})} value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === "signin" ? "current-password" : "new-password"} required/></label>{error && <p className="auth-error">{error}</p>}<button className="primary" disabled={busy}>{busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}<ArrowRight/></button></form><button className="auth-toggle" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }}>{mode === "signin" ? "New here? Create an account" : "Already have an account? Sign in"}</button><button className="offline-reading" onClick={onReadOffline}><BookOpen size={16}/> Read Bible offline</button><small className="local-note">Your practice is saved to your account. By continuing you agree to our <button type="button" className="legal-link inline" onClick={onTerms}>Terms of Service</button> and <button type="button" className="legal-link inline" onClick={onPrivacy}>Privacy Policy</button>.</small></div></section></main>;
 }
 
 function shuffle<T>(values: T[]) {

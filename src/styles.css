@@ -147,3 +147,16 @@ h1,h2,h3,blockquote { font-family:"Gilda Display",serif; font-weight:400; }
 .install-banner p{margin:0;font-size:13px;line-height:1.55;color:#5c6b63}
 .install-banner p svg{vertical-align:-2px;margin:0 1px}
 .install-dismiss{flex:none;opacity:.5}
+
+.legal-page{max-width:760px}
+.legal-body{margin-top:8px}
+.legal-lede{font:19px/1.65 "Gilda Display",serif;color:#44554c;padding-bottom:22px;border-bottom:1px solid var(--line)}
+.legal-body h2{font-size:21px;margin:34px 0 10px}
+.legal-body p{font-size:15px;line-height:1.75;color:#4f5b55;margin:0 0 14px;max-width:68ch}
+.legal-body ul{margin:0 0 14px;padding-left:22px;max-width:68ch}
+.legal-body li{font-size:15px;line-height:1.75;color:#4f5b55;margin-bottom:7px}
+.legal-body strong{color:var(--ink)}
+.legal-body a{color:#516f60}
+.legal-back{margin-top:38px;padding-top:22px;border-top:1px solid var(--line);width:100%}
+.legal-link{border:0;background:none;padding:0;margin-left:18px;color:#516f60;cursor:pointer;font-size:9px;text-decoration:underline}
+.legal-link.inline{margin-left:0;font-size:inherit;color:#845946}

@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "offline.spec.ts",
+  testMatch: ["offline.spec.ts", "overflow.spec.ts", "legal.spec.ts"],
   workers: 1,
   timeout: 60000,
   use: { actionTimeout: 10000, baseURL: "http://127.0.0.1:4179", viewport: { width: 412, height: 915 }, screenshot: "only-on-failure", trace: "retain-on-failure" },

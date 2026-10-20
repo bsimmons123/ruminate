@@ -620,3 +620,12 @@
 /* The native app is already installed; the banner never renders there, but the rule
    keeps it out of the layout if that ever changes. */
 .native .install-banner { display: none; }
+
+/* ---------- Legal pages ---------- */
+
+.native .legal-page { max-width: none; }
+.native .legal-lede { font-size: 17px; }
+.native .legal-body h2 { font-size: 19px; margin-top: 28px; }
+.native .legal-body p, .native .legal-body li { font-size: 15px; max-width: none; }
+.native .legal-back { min-height: var(--touch); justify-content: center; }
+.native .legal-link { min-height: var(--touch); display: inline-flex; align-items: center; margin-left: 14px; }
