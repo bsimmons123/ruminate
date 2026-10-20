@@ -13,3 +13,9 @@ android/app/google-services.json
 # Browser regression test output
 test-results/
 playwright-report/
+
+# Xcode build output. ios/.gitignore covers App/build, DerivedData and xcuserdata,
+# but the SPM package's own ignore lists /.build rather than build/, so the ~90 files
+# Xcode writes there are missed. Kept here because the ios/ ignores are Capacitor
+# templates and would lose the entry if regenerated.
+ios/App/CapApp-SPM/build/
