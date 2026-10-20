@@ -17,7 +17,8 @@
     "push:test": "node scripts/send-test-push.mjs",
     "test:bible": "node --test tests/web-bible.test.mjs",
     "test:offline": "playwright test",
-    "test:install": "node --experimental-strip-types --test tests/install-prompt.test.mjs"
+    "test:install": "node --experimental-strip-types --test tests/install-prompt.test.mjs",
+    "test:review": "node --experimental-strip-types --test tests/review-queue.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

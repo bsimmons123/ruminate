@@ -5,6 +5,7 @@ import { getLibrary, getPassages, getReviews, getSettings, getUsers, removeItem,
 import { bibleBooks, DEFAULT_TRANSLATION, fetchBibleBook, fetchPassage, fetchPassageVerses, translations } from "./bible";
 import { esvStoredCount, parseEsvReference } from "./esvCompliance";
 import { hashPassword, SESSION_KEY } from "./auth";
+import { buildReviewQueue, isMemorized, shuffle } from "./review";
 import { shouldOfferInstall } from "./installPrompt";
 import { apiCollections, apiCommunityTags, apiCurrentUser, apiDelete, apiDeleteAccount, apiItems, apiPut, apiSignIn, apiSignOut, apiSignUp, apiSyncPending, serverEnabled } from "./api";
 import type { ConnectionState } from "./api";
@@ -22,7 +23,6 @@ type Page = "home" | "reels" | "store" | "library" | "memory-bank" | "history" |
 type ExerciseSummary = Pick<ReviewResult, "mode" | "correct" | "total" | "percentage" | "answers">;
 
 const starterIds = ["ps-46-10", "prov-3-5-6", "john-3-16"];
-const isMemorized = (item: LibraryItem) => item.memorized ?? item.stage >= 6;
 const normalizeTranslation = (value: string | undefined): Translation => translations.some(item => item.id === value) ? value as Translation : DEFAULT_TRANSLATION;
 
 function reviewStreak(results: ReviewResult[]) {
@@ -57,7 +57,11 @@ function App() {
   const [toast, setToast] = useState("");
   const reviewSaving = useRef(false);
   const [reviewIndex, setReviewIndex] = useState(0);
-  const [quizIds, setQuizIds] = useState<string[] | null>(null);
+  /* A review session is a snapshot of verse ids taken when it starts. Reading the
+     queue live would reshuffle it under the reader as each rating reschedules a verse. */
+  const [sessionIds, setSessionIds] = useState<string[] | null>(null);
+  const [sessionKind, setSessionKind] = useState<"review" | "quiz">("review");
+  const startReviewRef = useRef<() => void>(() => {});
   const [reviewReturn, setReviewReturn] = useState<Page>("home");
   // Keep the address bar truthful for the two pages that have addresses.
   useEffect(() => {
@@ -98,7 +102,7 @@ function App() {
   useEffect(() => { const update = () => { setOnline(navigator.onLine); if (navigator.onLine) void apiSyncPending(); }; window.addEventListener("online", update); window.addEventListener("offline", update); return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); }; }, []);
   useEffect(() => {
     const status = (event: Event) => setConnection((event as CustomEvent<ConnectionState>).detail);
-    const expired = () => { setUser(null); setUserSettings(null); setLibrary([]); setHistory([]); setCatalog(verses); setQuizIds(null); setPage("home"); setMenu(false); setStartupError(""); setReady(true); };
+    const expired = () => { setUser(null); setUserSettings(null); setLibrary([]); setHistory([]); setCatalog(verses); setSessionIds(null); setPage("home"); setMenu(false); setStartupError(""); setReady(true); };
     window.addEventListener("ruminate-connection", status); window.addEventListener("ruminate-session-expired", expired);
     return () => { window.removeEventListener("ruminate-connection", status); window.removeEventListener("ruminate-session-expired", expired); };
   }, []);
@@ -120,13 +124,13 @@ function App() {
     return () => { window.clearInterval(timer); window.removeEventListener("ruminate-sync-complete", refreshed); document.removeEventListener("visibilitychange", retry); };
   }, [user?.id, connection.pending, connection.mode]);
   useEffect(() => { if (user && settings?.reminders && online && connection.mode === "online") void enablePush().catch(error => console.error("Push registration unavailable", error)); }, [user?.id, settings?.reminders, online, connection.mode]);
-  useEffect(() => { const openReview = () => { setQuizIds(null); setReviewReturn("home"); setReviewIndex(0); setPage("review"); }; window.addEventListener("selah-open-review", openReview); return () => window.removeEventListener("selah-open-review", openReview); }, []);
+  useEffect(() => { const openReview = () => startReviewRef.current(); window.addEventListener("selah-open-review", openReview); return () => window.removeEventListener("selah-open-review", openReview); }, []);
   useEffect(() => { currentPage.current = page; }, [page]);
   useEffect(() => { if (!isNativeApp || Capacitor.getPlatform() !== "android") return; let disposed = false; let remove: (() => Promise<void>) | undefined; void NativeApp.addListener("backButton", () => { if (document.body.dataset.sheetOpen === "true") { window.dispatchEvent(new Event("ruminate-close-sheet")); return; } if (currentPage.current === "home") void NativeApp.exitApp(); else { setPage("home"); setMenu(false); } }).then(handle => { if (disposed) void handle.remove(); else remove = () => handle.remove(); }); return () => { disposed = true; void remove?.(); }; }, []);
 
   const due = library.filter(item => new Date(item.nextReview) <= new Date());
   const streak = reviewStreak(history);
-  const reviewItems = quizIds ? quizIds.flatMap(id => { const item = library.find(value => value.verseId === id); return item ? [item] : []; }) : library;
+  const reviewItems = (sessionIds ?? []).flatMap(id => { const item = library.find(value => value.verseId === id); return item ? [item] : []; });
   const memorizedItems = library.filter(item => isMemorized(item) && catalog.some(verse => verse.id === item.verseId));
   const verseFor = (id: string) => catalog.find(v => v.id === id)!;
   const topics = ["All", ...Array.from(new Set(catalog.flatMap(v => v.topics)))];
@@ -199,20 +203,32 @@ function App() {
       } else {
         setReviewIndex(0);
         setPage(reviewReturn);
-        setQuizIds(null);
-        notify(quizIds ? "Memory Bank quiz complete" : "Review complete — well done");
+        setSessionIds(null);
+        notify(sessionKind === "quiz" ? "Memory Bank quiz complete" : "Review complete — well done");
       }
     } catch { notify("Could not save your review. Please try again."); }
     finally { reviewSaving.current = false; }
   }
 
+  /* Honour the spaced-repetition schedule: practise what is due, and when nothing is
+     due offer a fresh, shuffled set rather than the same list in the same order. */
+  function startReview(from: Page = "home") {
+    setSessionIds(buildReviewQueue(library, history).verseIds);
+    setSessionKind("review");
+    setReviewIndex(0);
+    setReviewReturn(from);
+    setPage("review");
+    setMenu(false);
+  }
+  startReviewRef.current = () => startReview("home");
+
   function navigate(next: Page) {
-    if (next === "review") { setReviewIndex(0); setQuizIds(null); setReviewReturn("home"); }
+    if (next === "review") { startReview("home"); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     setPage(next); setMenu(false); window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function startMemoryQuiz(items: LibraryItem[]) {
     if (!items.length) return;
-    setQuizIds(shuffle(items.map(item => item.verseId))); setReviewIndex(0); setReviewReturn("memory-bank"); setPage("review"); setMenu(false);
+    setSessionIds(shuffle(items.map(item => item.verseId))); setSessionKind("quiz"); setReviewIndex(0); setReviewReturn("memory-bank"); setPage("review"); setMenu(false);
     window.scrollTo({ top: 0 });
   }
 
@@ -244,7 +260,7 @@ function App() {
     setUser(null);
     setUserSettings(null);
     setLibrary([]);
-    setQuizIds(null);
+    setSessionIds(null);
     setHistory([]);
     setCatalog(verses);
     setMenu(false);
@@ -261,7 +277,7 @@ function App() {
     setUser(null);
     setUserSettings(null);
     setLibrary([]);
-    setQuizIds(null);
+    setSessionIds(null);
     setHistory([]);
     setCatalog(verses);
     setMenu(false);
@@ -297,7 +313,7 @@ function App() {
         {page === "terms" && <TermsPage onBack={() => navigate("home")} />}
         {page === "privacy" && <PrivacyPage onBack={() => navigate("home")} />}
         {page === "settings" && settings && <SettingsPage user={user} settings={settings} onSave={updateSettings} onSignOut={signOut} signingOut={signingOut} onDeleteAccount={deleteAccount} />}
-        {page === "review" && <ReviewPage key={reviewItems[reviewIndex]?.verseId} items={reviewItems} index={reviewIndex} verse={reviewItems[reviewIndex] ? verseFor(reviewItems[reviewIndex].verseId) : undefined} onRate={rate} onClose={() => navigate(reviewReturn)} initialMode={quizIds ? "impossible" : "easy"} />}
+        {page === "review" && <ReviewPage key={reviewItems[reviewIndex]?.verseId} items={reviewItems} index={reviewIndex} verse={reviewItems[reviewIndex] ? verseFor(reviewItems[reviewIndex].verseId) : undefined} onRate={rate} onClose={() => navigate(reviewReturn)} initialMode={sessionKind === "quiz" ? "impossible" : "easy"} />}
       </main>
       {page !== "reels" && <div className="esv-global"><strong>Noncommercial Scripture-memory project</strong><p>Scripture quotations marked “ESV” are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved. The ESV text may not be quoted in any publication made available to the public by a Creative Commons license. The ESV may not be translated into any other language.</p><p>Users may not copy or download more than 500 verses of the ESV Bible or more than one half of any book of the ESV Bible.</p><a href="https://www.esv.org/" target="_blank" rel="noreferrer">Read at ESV.org</a><button className="legal-link" onClick={() => navigate("terms")}>Terms of Service</button><button className="legal-link" onClick={() => navigate("privacy")}>Privacy Policy</button></div>}
       {(!online || connection.mode !== "online" || connection.pending > 0) && <div className="offline-badge" role="status"><WifiOff/>{connection.mode === "syncing" ? "Syncing saved practice…" : `Saved on this device${connection.pending ? ` · ${connection.pending} updates waiting to sync` : " · Offline access"}`}</div>}
@@ -338,15 +354,6 @@ function AuthPage({ onAuthenticated, onReadOffline, onTerms, onPrivacy }: { onRe
     } catch (err) { setError(err instanceof Error ? err.message : "Authentication failed"); } finally { setBusy(false); }
   }
   return <main className="auth-page"><section className="auth-story"><div className="brand auth-brand"><span className="brand-mark">R</span><span>Ruminate<small>scripture memory</small></span></div><div><span className="overline">Keep the Word close</span><blockquote>“Thy word have I hid in mine heart, that I might not sin against thee.”</blockquote><p>Psalm 119:11</p></div></section><section className="auth-form"><div><p className="eyebrow">Welcome to Ruminate</p><h1>{mode === "signin" ? "Return to your practice." : "Begin your practice."}</h1><p>{mode === "signin" ? "Sign in to continue where you left off." : "Create your secure, synchronized account."}</p><form onSubmit={submit}>{mode === "signup" && <label>Your name<input value={name} onChange={e => setName(e.target.value)} autoComplete="name" required/></label>}<label>Email address<input type="email" {...(isNativeApp ? { inputMode: "email" as const, autoCapitalize: "none", autoCorrect: "off", spellCheck: false, enterKeyHint: "next" as const } : {})} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required/></label><label>Password<input type="password" minLength={8} {...(isNativeApp ? { enterKeyHint: "go" as const } : {})} value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === "signin" ? "current-password" : "new-password"} required/></label>{error && <p className="auth-error">{error}</p>}<button className="primary" disabled={busy}>{busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}<ArrowRight/></button></form><button className="auth-toggle" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }}>{mode === "signin" ? "New here? Create an account" : "Already have an account? Sign in"}</button><button className="offline-reading" onClick={onReadOffline}><BookOpen size={16}/> Read Bible offline</button><small className="local-note">Your practice is saved to your account. By continuing you agree to our <button type="button" className="legal-link inline" onClick={onTerms}>Terms of Service</button> and <button type="button" className="legal-link inline" onClick={onPrivacy}>Privacy Policy</button>.</small></div></section></main>;
-}
-
-function shuffle<T>(values: T[]) {
-  const result = [...values];
-  for (let index = result.length - 1; index > 0; index--) {
-    const swap = Math.floor(Math.random() * (index + 1));
-    [result[index], result[swap]] = [result[swap], result[index]];
-  }
-  return result;
 }
 
 function TranslationSelect({ value, onChange, compact = false, offlineOnly = false }: { value: Translation; onChange: (value: Translation) => void; compact?: boolean; offlineOnly?: boolean }) {
@@ -629,7 +636,7 @@ function HomePage({ due, streak, library, verseFor, onReview, onStore }: { due: 
   return <div className="page home-page">
     <InstallBanner/>
     <section className="welcome"><div><p className="eyebrow">{today}</p><h1>Good morning.</h1><p>Make a little room for the Word today.</p><span className="mobile-streak"><Flame/> {streak}-day streak</span></div><div className="sun-ornament">✦</div></section>
-    <section className="review-card"><div className="review-copy"><span className="overline"><Sparkles size={15} /> Today’s practice</span><h2>{due || library.length} {due === 1 ? "verse is" : "verses are"} ready for you</h2><p>A few quiet minutes now can keep these words close all day.</p>{isNativeApp && <div className="review-stats"><div><strong>{due || library.length}</strong><span>Due</span></div><div><strong>{library.length}</strong><span>In library</span></div><div><strong>{streak}</strong><span>Day streak</span></div></div>}<button className="primary" onClick={onReview}>Begin review <ArrowRight size={18} /></button></div><div className="progress-ring"><svg viewBox="0 0 100 100"><circle className="track" cx="50" cy="50" r="42"/><circle className="fill" cx="50" cy="50" r="42"/></svg><strong>{due || library.length}</strong><span>due</span></div></section>
+    <section className="review-card"><div className="review-copy"><span className="overline"><Sparkles size={15} /> Today’s practice</span><h2>{due ? `${due} ${due === 1 ? "verse is" : "verses are"} ready for you` : "You are caught up for now"}</h2><p>{due ? "A few quiet minutes now can keep these words close all day." : "Nothing is scheduled yet. Keep going and we will draw from the verses you have not practised today."}</p>{isNativeApp && <div className="review-stats"><div><strong>{due}</strong><span>Due</span></div><div><strong>{library.length}</strong><span>In library</span></div><div><strong>{streak}</strong><span>Day streak</span></div></div>}<button className="primary" onClick={onReview}>{due ? "Begin review" : "Practise anyway"} <ArrowRight size={18} /></button></div><div className="progress-ring"><svg viewBox="0 0 100 100"><circle className="track" cx="50" cy="50" r="42"/><circle className="fill" cx="50" cy="50" r="42"/></svg><strong>{due}</strong><span>due</span></div></section>
     <div className="section-heading"><div><span className="overline">Continue learning</span><h2>Your verses</h2></div><button className="text-button" onClick={onStore}>Explore store <ArrowRight size={16}/></button></div>
     <div className="verse-strip">{library.slice(0, 3).map((item, i) => { const v = verseFor(item.verseId); return <article className="mini-verse" key={v.id}><span className="count">0{i + 1}</span><p>“{v.text.length > 115 ? v.text.slice(0, 115) + "…" : v.text}”</p><div><strong>{v.reference}</strong><span>{item.reviews ? `${item.reviews} reviews` : "New"}</span></div></article> })}</div>
     <section className="daily-verse"><div className="leaf">❧</div><span className="overline">Verse for today</span><blockquote>“Thy word is a lamp unto my feet,<br/>and a light unto my path.”</blockquote><p>Psalm 119:105 <i>KJV</i></p></section>
