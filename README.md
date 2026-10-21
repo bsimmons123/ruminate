@@ -55,6 +55,16 @@ For a production-targeted mobile build, run `npm run mobile:sync:prod`. This pac
 
 Pushes to `master` in `bsimmons123/ruminate` run `.github/workflows/publish-android.yml`, which builds a signed production-targeted APK and attaches it with a SHA-256 checksum to a GitHub Release named for the commit. The workflow needs four repository secrets: `ANDROID_KEYSTORE_BASE64` (base64 of the Android signing keystore), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Keep the original keystore and passwords backed up securely; future APKs must use the same key to update an installed app. A `workflow_dispatch` run can retry publishing after the backend is updated.
 
+### In-app updates (Android)
+
+The Android app checks for a newer release when it opens or resumes (at most every 10 minutes) and shows an Update / Later banner. Update downloads the APK through the Ruminate backend, verifies its SHA-256 and size, and installs it in place; Android asks once for "Allow from this source". The web app and iOS never show the banner.
+
+- The backend reads the latest GitHub release of `RUMINATE_APP_REPO` (default `bsimmons123/ruminate`; set `GITHUB_TOKEN` for a private repo or higher rate limits) and caches it for 10 minutes. `GET /api/app/latest` returns `{configured, version, version_code, size, published_at, notes, sha256}`; `GET /api/app/download` streams the APK with an `X-Sha256` header. Neither needs a session.
+- The release workflow stamps `versionCode` from the run number and names assets `ruminate-v<version>-c<versionCode>.apk` plus `.sha256`. The backend ignores releases that do not use this naming. Deploy the backend before shipping an APK that includes the banner.
+- A build signed with a different key than the installed app cannot update in place; the banner explains the one-time uninstall.
+- Moving to the Play Store: build with `./gradlew assembleRelease -PupdateSource=play`. The banner then reads "Open Play Store" and links to the listing instead of downloading. Remove `REQUEST_INSTALL_PACKAGES` from the manifest for the Play build.
+- Tests: `npm run test:update` (backend release parsing and the update rules) and `cd android && ./gradlew testDebugUnitTest` (download verification).
+
 ### Native push reminders
 
 - Android: add your Firebase project's `google-services.json` at `android/app/google-services.json` (ignored by Git). Give the API a Firebase service account through `FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS`.
