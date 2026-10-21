@@ -1,4 +1,5 @@
 import type { CommunityCollection, User } from "./types";
+import { parseLatest } from "./update";
 import { Capacitor } from "@capacitor/core";
 import { acknowledgeChange, cachedItems, cacheServerItems, forgetAccount, pendingChanges, queueChange, rememberedUser, rememberUser } from "./offline";
 import type { PendingChange } from "./offline";
@@ -188,3 +189,10 @@ export const apiCollections = () => request<CommunityCollection[]>("/collections
 export const apiCommunityTags = () => request<Record<string, { tag: string; uses: number }[]>>("/community-tags");
 export const apiRegisterDevice = (token: string, platform: "android" | "ios") => request<{ ok: boolean }>("/devices", { method: "PUT", body: JSON.stringify({ token, platform, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }) });
 export const apiRemoveDevice = (token: string) => request<{ ok: boolean }>(`/devices/${encodeURIComponent(token)}`, { method: "DELETE" });
+
+/** Newest Android release, for the in-app updater. Needs no sign-in so it also works on the sign-in screen. */
+export const apiLatestRelease = async () => {
+  const response = await fetch(apiUrl("/app/latest"));
+  if (!response.ok) throw new Error(`Update check failed (${response.status})`);
+  return parseLatest(await response.json());
+};

@@ -8,6 +8,7 @@ import "./reels.css";
 import "./native.css";
 import { isNativeApp } from "./nativePush";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { UpdateBanner } from "./components/UpdateBanner";
 
 if (isNativeApp) {
   document.documentElement.classList.add("native");
@@ -25,7 +26,7 @@ if (isNativeApp) {
 const escapeHatch = () => { localStorage.clear(); window.location.reload(); };
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode><ErrorBoundary onSignOut={escapeHatch}><App /></ErrorBoundary></React.StrictMode>
+  <React.StrictMode><ErrorBoundary onSignOut={escapeHatch}><App /></ErrorBoundary>{isNativeApp && <UpdateBanner />}</React.StrictMode>
 );
 
 if (!isNativeApp && "serviceWorker" in navigator && import.meta.env.PROD) {
