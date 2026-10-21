@@ -3,12 +3,18 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.selah.scripturememory"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig true
+    }
     defaultConfig {
         applicationId "com.selah.scripturememory"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // CI passes the workflow run number so every published APK is strictly newer than the last.
+        versionCode Integer.parseInt((project.findProperty("appVersionCode") ?: "1").toString())
+        versionName (project.findProperty("appVersionName") ?: "1.0").toString()
+        // "sideload" downloads and installs updates in-app; "play" sends the user to the Play Store instead.
+        buildConfigField "String", "UPDATE_SOURCE", '"' + (project.findProperty("updateSource") ?: "sideload").toString() + '"'
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

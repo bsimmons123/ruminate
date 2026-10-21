@@ -61,17 +61,20 @@ jobs:
 
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/ruminate-release.jks"
           chmod 600 "$RUNNER_TEMP/ruminate-release.jks"
-          (cd android && ./gradlew assembleRelease --no-daemon)
+          version_name="1.0.${GITHUB_RUN_NUMBER}"
+          apk_name="ruminate-v${version_name}-c${GITHUB_RUN_NUMBER}.apk"
+          echo "APK_NAME=$apk_name" >> "$GITHUB_ENV"
+          (cd android && ./gradlew assembleRelease --no-daemon -PappVersionCode="$GITHUB_RUN_NUMBER" -PappVersionName="$version_name")
 
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
             --ks "$RUNNER_TEMP/ruminate-release.jks" \
             --ks-key-alias "$ANDROID_KEY_ALIAS" \
             --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
             --key-pass env:ANDROID_KEY_PASSWORD \
-            --out "$RUNNER_TEMP/ruminate-android.apk" \
+            --out "$RUNNER_TEMP/$apk_name" \
             android/app/build/outputs/apk/release/app-release-unsigned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$RUNNER_TEMP/ruminate-android.apk"
-          (cd "$RUNNER_TEMP" && sha256sum ruminate-android.apk > ruminate-android.apk.sha256)
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$RUNNER_TEMP/$apk_name"
+          (cd "$RUNNER_TEMP" && sha256sum "$apk_name" > "$apk_name.sha256")
 
       - name: Publish GitHub Release
         env:
@@ -82,12 +85,12 @@ jobs:
           tag="android-${GITHUB_SHA:0:12}"
           title="Ruminate Android ${GITHUB_SHA:0:12}"
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "$RUNNER_TEMP/ruminate-android.apk" "$RUNNER_TEMP/ruminate-android.apk.sha256" --clobber
+            gh release upload "$tag" "$RUNNER_TEMP/$APK_NAME" "$RUNNER_TEMP/$APK_NAME.sha256" --clobber
           else
             gh release create "$tag" \
-              "$RUNNER_TEMP/ruminate-android.apk" \
-              "$RUNNER_TEMP/ruminate-android.apk.sha256" \
+              "$RUNNER_TEMP/$APK_NAME" \
+              "$RUNNER_TEMP/$APK_NAME.sha256" \
               --target "$GITHUB_SHA" \
               --title "$title" \
-              --notes 'Installable Android APK configured for https://ruminate.simmonsweb.com. Requires the matching Ruminate backend API.'
+              --notes "$(git log -1 --pretty=%s). Installable Android APK configured for https://ruminate.simmonsweb.com. Requires the matching Ruminate backend API."
           fi
