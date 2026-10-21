@@ -7,7 +7,9 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
 import { startReminderScheduler } from "./reminders.js";
+import { createReleaseCache, toLatestResponse } from "./appRelease.js";
 import { bundledTranslations, getBibleBook, getBibleManifest, getBiblePassage } from "./bundled-bible.js";
 
 const app = express();
@@ -21,6 +23,7 @@ app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Ruminate-Native");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Expose-Headers", "X-Sha256");
     res.setHeader("Vary", "Origin");
   }
   if (req.method === "OPTIONS") return res.sendStatus(204);
@@ -121,6 +124,35 @@ app.get("/api/bible/:translation/book/:number", requireUser, async (req, res, ne
 });
 
 app.get("/api/esv", requireUser, async (req, res) => { try { if (!process.env.ESV_API_KEY) return res.status(503).json({ error: "ESV_API_KEY is not configured." }); const query = String(req.query.q || ""); if (!/^.+\s\d+:\d+(?:-\d+)?$/.test(query)) return res.status(400).json({ error: "Use a single-chapter reference such as John 3:16-18." }); const { rows } = await pool.query("select count(*) filter (where requested_at > now() - interval '1 minute')::int as minute, count(*) filter (where requested_at > now() - interval '1 hour')::int as hour, count(*) filter (where requested_at > now() - interval '1 day')::int as day from esv_requests"); if (rows[0].minute >= 60 || rows[0].hour >= 1000 || rows[0].day >= 5000) return res.status(429).json({ error: "ESV request limit reached. Please try again later." }); await pool.query("insert into esv_requests default values"); const upstream = await fetch(`https://api.esv.org/v3/passage/text/?q=${encodeURIComponent(query)}&include-headings=false&include-footnotes=false&include-verse-numbers=false&include-passage-references=false&include-short-copyright=false`, { headers: { Authorization: `Token ${process.env.ESV_API_KEY}` } }); const data = await upstream.json(); res.status(upstream.status).json(upstream.ok ? { reference: data.canonical, text: data.passages?.[0] || "" } : { error: data.detail || "ESV request failed" }); } catch (error) { console.error("ESV route failed:", error instanceof Error ? error.message : error); res.status(500).json({ error: "ESV passage could not be loaded." }); } });
+
+/* In-app Android updates: the latest GitHub release, cached, and the APK proxied so the app only talks to this server. */
+const appRepo = process.env.RUMINATE_APP_REPO ?? "bsimmons123/ruminate";
+const githubHeaders = { "User-Agent": "ruminate", ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) };
+const releases = createReleaseCache({
+  ttlMs: 10 * 60 * 1000,
+  fetchJson: async () => {
+    const response = await fetch(`https://api.github.com/repos/${appRepo}/releases/latest`, { headers: { ...githubHeaders, Accept: "application/vnd.github+json" } });
+    if (!response.ok) throw new Error(`GitHub responded ${response.status}`);
+    return response.json();
+  },
+  fetchText: async url => { const response = await fetch(url, { headers: githubHeaders }); if (!response.ok) throw new Error(`GitHub responded ${response.status}`); return response.text(); }
+});
+app.get("/api/app/latest", async (_req, res) => { res.json(toLatestResponse(appRepo ? await releases.get() : null, Boolean(appRepo))); });
+app.get("/api/app/download", async (_req, res) => {
+  const latest = appRepo ? await releases.get() : null;
+  if (!latest) return res.status(404).json({ error: "No app update is available." });
+  let upstream;
+  try { upstream = await fetch(latest.downloadUrl, { headers: githubHeaders }); } catch { return res.status(502).json({ error: "The update could not be fetched." }); }
+  if (!upstream.ok || !upstream.body) return res.status(502).json({ error: "The update could not be fetched." });
+  res.setHeader("Content-Type", "application/vnd.android.package-archive");
+  res.setHeader("Cache-Control", "no-store");
+  if (latest.size) res.setHeader("Content-Length", String(latest.size));
+  if (latest.sha256) res.setHeader("X-Sha256", latest.sha256);
+  // A broken stream is cut off so the app's size check fails instead of installing a truncated file.
+  const body = Readable.fromWeb(upstream.body);
+  body.on("error", () => res.destroy());
+  body.pipe(res);
+});
 
 app.use("/api", (_req, res) => res.status(404).json({ error: "API route not found. Restart Ruminate after updating the application." }));
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."); app.use(express.static(path.join(root, "dist"), { setHeaders(res, file) { if (file.includes(`${path.sep}assets${path.sep}`)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable"); } })); app.use((_req, res) => res.sendFile(path.join(root, "dist", "index.html")));
