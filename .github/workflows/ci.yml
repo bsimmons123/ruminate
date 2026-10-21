@@ -32,6 +32,9 @@ jobs:
       - name: Validate bundled Bible text and lookup
         run: npm run test:bible
 
+      - name: Validate app update logic
+        run: npm run test:update
+
       - name: Build web application
         run: npm run build
 
