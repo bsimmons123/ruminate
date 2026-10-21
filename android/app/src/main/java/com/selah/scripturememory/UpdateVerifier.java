@@ -41,6 +41,17 @@ final class UpdateVerifier {
             : new Result(false, "The download failed its checksum.");
     }
 
+    /** Updates may only come from our own backend, over https, from the download endpoint. */
+    static boolean isAllowedUrl(String address, String host) {
+        try {
+            java.net.URI uri = new java.net.URI(address);
+            return "https".equals(uri.getScheme()) && host.equalsIgnoreCase(uri.getHost()) && uri.getPort() == -1
+                && "/api/app/download".equals(uri.getPath()) && uri.getUserInfo() == null;
+        } catch (java.net.URISyntaxException e) {
+            return false;
+        }
+    }
+
     static String sha256Hex(File file) throws IOException {
         try (InputStream input = new FileInputStream(file)) {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

@@ -89,6 +89,7 @@ public class AppUpdatePlugin extends Plugin {
         String url = call.getString("url");
         Integer versionCode = call.getInt("versionCode");
         if (url == null || versionCode == null) { call.reject("A url and versionCode are required.", "DOWNLOAD_FAILED"); return; }
+        if (!UpdateVerifier.isAllowedUrl(url, BuildConfig.UPDATE_HOST)) { call.reject("The update address is not trusted.", "DOWNLOAD_FAILED"); return; }
         // Ask for "Allow from this source" before spending a download on an install Android would refuse.
         if (!canInstall()) { call.reject("Allow Ruminate to install apps first.", "NEEDS_PERMISSION"); return; }
         String releaseSha = call.getString("sha256");
@@ -100,6 +101,8 @@ public class AppUpdatePlugin extends Plugin {
                 String headerSha = download(url, file, size);
                 UpdateVerifier.Result verification = UpdateVerifier.verify(file, headerSha, releaseSha, size);
                 if (!verification.ok) { file.delete(); call.reject(verification.reason, "VERIFY_FAILED"); return; }
+                // A checksum served next to the APK proves nothing about who built it; Android's own signing check does.
+                if (!signedByUs(file)) { file.delete(); call.reject("The download was not signed by the same key as this app, so it was refused.", "VERIFY_FAILED"); return; }
                 try { installWithSession(file); }
                 catch (Exception sessionFailure) { installWithIntent(file); }
                 JSObject result = new JSObject();
@@ -116,6 +119,7 @@ public class AppUpdatePlugin extends Plugin {
     /** Streams the APK to [file] and returns the server's X-Sha256 header, if any. */
     private String download(String address, File file, long expectedSize) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
+        connection.setInstanceFollowRedirects(false);
         connection.setConnectTimeout(15_000);
         connection.setReadTimeout(30_000);
         try {
@@ -141,6 +145,31 @@ public class AppUpdatePlugin extends Plugin {
         } finally {
             connection.disconnect();
         }
+    }
+
+    /** True when the APK is this app's package, signed by the same certificate as the installed copy. */
+    @SuppressWarnings("deprecation")
+    private boolean signedByUs(File file) {
+        android.content.pm.PackageManager pm = getContext().getPackageManager();
+        int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ? android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES : android.content.pm.PackageManager.GET_SIGNATURES;
+        try {
+            android.content.pm.PackageInfo archive = pm.getPackageArchiveInfo(file.getAbsolutePath(), flags);
+            android.content.pm.PackageInfo installed = pm.getPackageInfo(getContext().getPackageName(), flags);
+            if (archive == null || !PACKAGE_NAME.equals(archive.packageName)) return false;
+            return signers(archive).equals(signers(installed)) && !signers(installed).isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private static java.util.Set<String> signers(android.content.pm.PackageInfo info) {
+        java.util.Set<String> result = new java.util.HashSet<>();
+        android.content.pm.Signature[] signatures = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+            ? (info.signingInfo == null ? null : info.signingInfo.getApkContentsSigners())
+            : info.signatures;
+        if (signatures != null) for (android.content.pm.Signature signature : signatures) result.add(signature.toCharsString());
+        return result;
     }
 
     private void installWithSession(File file) throws Exception {

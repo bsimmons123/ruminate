@@ -14,6 +14,8 @@ android {
         versionCode Integer.parseInt((project.findProperty("appVersionCode") ?: "1").toString())
         versionName (project.findProperty("appVersionName") ?: "1.0").toString()
         // "sideload" downloads and installs updates in-app; "play" sends the user to the Play Store instead.
+        // The only host the updater will download an APK from.
+        buildConfigField "String", "UPDATE_HOST", '"' + (project.findProperty("updateHost") ?: "ruminate.simmonsweb.com").toString() + '"'
         buildConfigField "String", "UPDATE_SOURCE", '"' + (project.findProperty("updateSource") ?: "sideload").toString() + '"'
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
