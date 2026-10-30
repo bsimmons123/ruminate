@@ -64,13 +64,13 @@ public class UpdateVerifierTest {
     }
 
     @Test public void onlyOurOwnHttpsDownloadEndpointIsAllowed() {
-        String host = "ruminate.simmonsweb.com";
-        assertTrue(UpdateVerifier.isAllowedUrl("https://ruminate.simmonsweb.com/api/app/download", host));
-        assertFalse(UpdateVerifier.isAllowedUrl("http://ruminate.simmonsweb.com/api/app/download", host));
+        String host = "ruminate.bible";
+        assertTrue(UpdateVerifier.isAllowedUrl("https://ruminate.bible/api/app/download", host));
+        assertFalse(UpdateVerifier.isAllowedUrl("http://ruminate.bible/api/app/download", host));
         assertFalse(UpdateVerifier.isAllowedUrl("https://evil.example/api/app/download", host));
-        assertFalse(UpdateVerifier.isAllowedUrl("https://ruminate.simmonsweb.com.evil.example/api/app/download", host));
-        assertFalse(UpdateVerifier.isAllowedUrl("https://user@ruminate.simmonsweb.com/api/app/download", host));
-        assertFalse(UpdateVerifier.isAllowedUrl("https://ruminate.simmonsweb.com/other", host));
+        assertFalse(UpdateVerifier.isAllowedUrl("https://ruminate.bible.evil.example/api/app/download", host));
+        assertFalse(UpdateVerifier.isAllowedUrl("https://user@ruminate.bible/api/app/download", host));
+        assertFalse(UpdateVerifier.isAllowedUrl("https://ruminate.bible/other", host));
         assertFalse(UpdateVerifier.isAllowedUrl("not a url", host));
     }
 }

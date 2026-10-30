@@ -34,7 +34,7 @@ jobs:
           java-version: '21'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: 'platform-tools platforms;android-36 build-tools;35.0.0'
 
@@ -92,5 +92,5 @@ jobs:
               "$RUNNER_TEMP/$APK_NAME.sha256" \
               --target "$GITHUB_SHA" \
               --title "$title" \
-              --notes "$(git log -1 --pretty=%s). Installable Android APK configured for https://ruminate.simmonsweb.com. Requires the matching Ruminate backend API."
+              --notes "$(git log -1 --pretty=%s). Installable Android APK configured for https://ruminate.bible. Requires the matching Ruminate backend API."
           fi

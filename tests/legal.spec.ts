@@ -36,3 +36,15 @@ test("leaving a legal page restores the root URL", async ({ page }) => {
   await page.getByRole("button", { name: /^Back to/ }).click();
   await expect(page).toHaveURL(/\/$/);
 });
+
+test("deletion requests are available without an account or working API", async ({ page }) => {
+  await page.route("**/api/**", route => route.abort());
+  await page.goto("/delete-account");
+  await expect(page.getByRole("heading", { name: "Delete your Ruminate account" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request account deletion by email" })).toHaveAttribute("href", /^mailto:bsimmons@simmonsweb.com\?subject=Ruminate%20account%20deletion%20request/);
+  await expect(page.getByRole("heading", { name: "What gets deleted" })).toBeVisible();
+  await page.getByRole("link", { name: "Privacy Policy", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Privacy Policy", level: 1 })).toBeVisible();
+  await page.getByRole("link", { name: "request account deletion on our website" }).click();
+  await expect(page).toHaveURL(/\/delete-account$/);
+});

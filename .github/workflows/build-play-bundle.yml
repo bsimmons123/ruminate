@@ -1,0 +1,79 @@
+name: Build Google Play bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'Unique integer higher than all previous Play and sideload version codes'
+        required: true
+      version_name:
+        description: 'Version shown to users (for example 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;35.0.0'
+      - run: npm ci
+      - run: npm run mobile:sync:prod
+      - name: Configure Android push notifications
+        env:
+          ANDROID_GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+        run: |
+          node --input-type=module <<'JS'
+          import { writeFileSync } from 'node:fs';
+          const raw = process.env.ANDROID_GOOGLE_SERVICES_JSON;
+          if (!raw) throw new Error('Set ANDROID_GOOGLE_SERVICES_JSON to the Firebase Android app configuration');
+          const config = JSON.parse(raw);
+          if (!config.client?.some(client => client.client_info?.android_client_info?.package_name === 'com.selah.scripturememory')) {
+            throw new Error('Firebase configuration must include com.selah.scripturememory');
+          }
+          writeFileSync('android/app/google-services.json', raw, { mode: 0o600 });
+          JS
+      - name: Build and sign Play bundle
+        env:
+          VERSION_CODE: ${{ inputs.version_code }}
+          VERSION_NAME: ${{ inputs.version_name }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION_CODE" =~ ^[1-9][0-9]{0,9}$ ]] && (( VERSION_CODE <= 2100000000 )) || { echo 'Invalid version code'; exit 1; }
+          [[ "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Use a version name such as 1.0.0'; exit 1; }
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            [[ -n "${!name}" ]] || { echo "Missing required secret: $name"; exit 1; }
+          done
+          keystore="$RUNNER_TEMP/ruminate-play-upload.jks"
+          trap 'rm -f "$keystore"' EXIT
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          (cd android && ./gradlew bundleRelease testReleaseUnitTest --no-daemon -PupdateSource=play -PappVersionCode="$VERSION_CODE" -PappVersionName="$VERSION_NAME")
+          node scripts/check-play-manifest.mjs
+          mkdir -p play-artifact
+          cp android/app/build/outputs/bundle/release/app-release.aab play-artifact/ruminate-play.aab
+          jarsigner -keystore "$keystore" -storepass:env ANDROID_KEYSTORE_PASSWORD -keypass:env ANDROID_KEY_PASSWORD play-artifact/ruminate-play.aab "$ANDROID_KEY_ALIAS"
+          jarsigner -verify play-artifact/ruminate-play.aab
+          (cd play-artifact && sha256sum ruminate-play.aab > ruminate-play.aab.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ruminate-play-${{ inputs.version_code }}
+          path: play-artifact/
+          if-no-files-found: error

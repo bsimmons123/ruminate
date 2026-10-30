@@ -9,7 +9,7 @@ const user = (id: string) => ({ id, name: `User ${id}`, email: `${id}@example.in
 const initialItem = (verseId: string, memorized: boolean, reviews: number) => ({ verseId, stage: memorized ? 6 : 1, reviews, memorized, nextReview: "2026-10-01T00:00:00Z", addedAt: "2026-10-01T00:00:00Z", collection: "My Verses" });
 async function fixtures(page: Page, signedIn: string | null = "alpha") {
   const state = {
-    signedIn, expired: false, failNextLibraryUpload: false, failedUpload: false,
+    signedIn, expired: false, failNextLibraryUpload: false, failedUpload: false, failDeletion: false, deletions: 0,
     rows: {
       alpha: { library: { "john-3-16": initialItem("john-3-16", true, 10) }, passage: {}, review: {}, settings: { preferences: { userId: "alpha", translation: "WEB", dailyGoal: 5, theme: "light", reminders: false } } },
       beta: { library: { "ps-46-10": initialItem("ps-46-10", false, 2) }, passage: {}, review: {}, settings: { preferences: { userId: "beta", translation: "KJV", dailyGoal: 5, theme: "light", reminders: false } } },
@@ -26,6 +26,13 @@ async function fixtures(page: Page, signedIn: string | null = "alpha") {
     if (state.expired) return send({ error: "This session has been signed out." }, 401);
     if (path === "/api/auth/me") return send(state.signedIn ? user(state.signedIn) : null);
     if (!state.signedIn) return send({ error: "Please sign in." }, 401);
+    if (path === "/api/account" && request.method === "DELETE") {
+      if (state.failDeletion) return send({ error: "Deletion unavailable. Try again." }, 503);
+      delete state.rows[state.signedIn];
+      state.signedIn = null;
+      state.deletions++;
+      return send({ ok: true });
+    }
     const match = path.match(/^\/api\/data\/(\w+)(?:\/(.+))?$/);
     if (match) {
       const [, kind, rawId] = match, id = rawId ? decodeURIComponent(rawId) : undefined;
@@ -65,6 +72,33 @@ async function recall(page: Page) {
   await page.getByRole("button", { name: /Again/ }).click();
   await expect(page.getByRole("heading", { name: "Memory Bank", exact: true })).toBeVisible();
 }
+
+test("account deletion requires confirmation, preserves data on failure and clears local access on success", async ({ page }) => {
+  const state = await fixtures(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Delete my account", exact: true }).click();
+  const confirm = page.getByRole("button", { name: "Permanently delete", exact: true });
+  await expect(confirm).toBeDisabled();
+  await page.getByRole("textbox", { name: "Type alpha@example.invalid to confirm deletion" }).fill("wrong@example.invalid");
+  await expect(confirm).toBeDisabled();
+  await page.getByRole("textbox", { name: "Type alpha@example.invalid to confirm deletion" }).fill("alpha@example.invalid");
+  state.failDeletion = true;
+  await confirm.click();
+  await expect(page.getByText("Deletion unavailable. Try again.", { exact: true })).toBeVisible();
+  expect(state.deletions).toBe(0);
+  expect(state.rows.alpha).toBeDefined();
+  state.failDeletion = false;
+  await confirm.click();
+  await expect(page.getByRole("heading", { name: "Return to your practice." })).toBeVisible();
+  expect(state.deletions).toBe(1);
+  expect(state.rows.alpha).toBeUndefined();
+  expect(await page.evaluate(() => localStorage.getItem("ruminate-offline-user"))).toBeNull();
+  expect(await outbox(page)).toHaveLength(0);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Return to your practice." })).toBeVisible();
+});
 
 test("cached account survives offline reloads, all four translations work, and reviews sync without double counting", async ({ page, context }) => {
   const state = await fixtures(page);

@@ -54,7 +54,7 @@ public class AppUpdatePlugin extends Plugin {
         if (files != null) for (File file : files) file.delete();
     }
 
-    private boolean canInstall() { return getContext().getPackageManager().canRequestPackageInstalls(); }
+    private boolean canInstall() { return !"play".equals(BuildConfig.UPDATE_SOURCE) && getContext().getPackageManager().canRequestPackageInstalls(); }
 
     @PluginMethod
     public void getInfo(PluginCall call) {
@@ -68,6 +68,7 @@ public class AppUpdatePlugin extends Plugin {
 
     @PluginMethod
     public void openInstallSettings(PluginCall call) {
+        if ("play".equals(BuildConfig.UPDATE_SOURCE)) { call.reject("Updates are managed by Google Play.", "PLAY_MANAGED"); return; }
         Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName()))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         getContext().startActivity(intent);
@@ -86,6 +87,7 @@ public class AppUpdatePlugin extends Plugin {
 
     @PluginMethod
     public void downloadAndInstall(PluginCall call) {
+        if ("play".equals(BuildConfig.UPDATE_SOURCE)) { call.reject("Updates are managed by Google Play.", "PLAY_MANAGED"); return; }
         String url = call.getString("url");
         Integer versionCode = call.getInt("versionCode");
         if (url == null || versionCode == null) { call.reject("A url and versionCode are required.", "DOWNLOAD_FAILED"); return; }

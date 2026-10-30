@@ -78,6 +78,7 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
       </p>
 
       <h2>7. Your rights</h2>
+      <p>If you cannot sign in or no longer have the app, <a href="/delete-account">request account deletion on our website</a>. Offline copies on other devices can be removed by clearing Ruminate’s storage on those devices. Revoked-session records are retained until the session expires to prevent reuse.</p>
       <p>
         Depending on where you live, you may have the right to access, correct, export, or delete your
         personal information, and to object to certain processing. The deletion right is built directly

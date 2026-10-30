@@ -15,11 +15,12 @@ import { Capacitor } from "@capacitor/core";
 import { MemoryBankPage } from "./components/MemoryBankPage";
 import NativeShell, { tap } from "./components/NativeShell";
 import { TermsPage } from "./components/TermsPage";
+import { DeleteAccountPage } from "./components/DeleteAccountPage";
 import { PrivacyPage } from "./components/PrivacyPage";
 import { ImpactStyle } from "@capacitor/haptics";
 import type { CommunityCollection, LibraryItem, ReviewRating, ReviewResult, Theme, Translation, User, UserSettings, Verse } from "./types";
 
-type Page = "home" | "reels" | "store" | "library" | "memory-bank" | "history" | "settings" | "review" | "terms" | "privacy";
+type Page = "home" | "reels" | "store" | "library" | "memory-bank" | "history" | "settings" | "review" | "terms" | "privacy" | "delete-account";
 type ExerciseSummary = Pick<ReviewResult, "mode" | "correct" | "total" | "percentage" | "answers">;
 /* Everything needed to put a rated verse, and the session it was rated in, back. */
 type UndoEntry = { item: LibraryItem; resultId: string; index: number; sessionIds: string[] | null; sessionKind: "review" | "quiz"; reviewReturn: Page };
@@ -39,11 +40,10 @@ function reviewStreak(results: ReviewResult[]) {
 }
 
 function App() {
-  /* The legal pages are the only routes with real URLs. Apple requires a publicly
-     reachable privacy policy link, and a state-only SPA has none to offer. */
+  /* Public policy and deletion URLs must work without a signed-in account. */
   const [page, setPage] = useState<Page>(() => {
     const path = window.location.pathname.replace(/\/+$/, "");
-    return path === "/privacy" ? "privacy" : path === "/terms" ? "terms" : "home";
+    return path === "/delete-account" ? "delete-account" : path === "/privacy" ? "privacy" : path === "/terms" ? "terms" : "home";
   });
   const currentPage = useRef<Page>("home");
   const [library, setLibrary] = useState<LibraryItem[]>([]);
@@ -86,12 +86,12 @@ function App() {
     return () => media.removeEventListener("change", sync);
   }, [theme]);
 
-  // Keep the address bar truthful for the two pages that have addresses.
+  // Keep the address bar truthful for public pages.
   useEffect(() => {
     if (isNativeApp) return;
-    const path = page === "privacy" ? "/privacy" : page === "terms" ? "/terms" : "/";
+    const path = page === "delete-account" ? "/delete-account" : page === "privacy" ? "/privacy" : page === "terms" ? "/terms" : "/";
     const current = window.location.pathname.replace(/\/+$/, "") || "/";
-    const legal = current === "/privacy" || current === "/terms";
+    const legal = current === "/privacy" || current === "/terms" || current === "/delete-account";
     if (current !== path && (legal || path !== "/")) window.history.replaceState(null, "", path);
   }, [page]);
   const [menu, setMenu] = useState(false);
@@ -292,12 +292,15 @@ function App() {
     window.scrollTo({ top: 0 });
   }
 
+  // Public information remains available even if authentication or storage fails.
+  if (page === "delete-account") return <DeleteAccountPage onBack={() => setPage("home")} />;
+  if (page === "privacy") return <PrivacyPage onBack={() => setPage("home")} />;
+  if (page === "terms") return <TermsPage onBack={() => setPage("home")} />;
+
   if (offlineReader) return <ReelsPage catalog={[]} library={[]} translation="WEB" readOnly onBack={() => setOfflineReader(false)} onPin={() => {}} onImport={async () => {}} />;
   if (!ready) return <div className="loading"><span>Ruminate</span><i /><button className="offline-reading" onClick={() => setOfflineReader(true)}>Read Bible offline</button></div>;
   if (startupError) return <main className="empty"><BookOpen/><h1>Could not open Ruminate</h1><p>{startupError}</p><button className="primary" onClick={() => window.location.reload()}>Try again</button><button className="offline-reading" onClick={() => setOfflineReader(true)}>Read Bible offline</button></main>;
   // Terms must be readable before signing up, since that is when people agree to them.
-  if (!user && page === "terms") return <TermsPage onBack={() => setPage("home")} />;
-  if (!user && page === "privacy") return <PrivacyPage onBack={() => setPage("home")} />;
   if (!user) return <AuthPage onTerms={() => setPage("terms")} onPrivacy={() => setPage("privacy")} onReadOffline={() => setOfflineReader(true)} onAuthenticated={async activeUser => {
     localStorage.setItem(SESSION_KEY, activeUser.id);
     const [savedLibrary, savedPassages, savedReviews, savedPreferences] = await Promise.all([apiItems<LibraryItem>("library"), apiItems<Verse>("passage"), apiItems<ReviewResult>("review"), apiItems<UserSettings>("settings")]);
@@ -370,8 +373,6 @@ function App() {
         {page === "library" && <LibraryPage library={library} verseFor={verseFor} unreadableCount={unreadableCount} onRemove={toggleVerse} onUpdate={updateLibraryItem} onReview={() => navigate("review")} onStore={() => navigate("store")} />}
         {page === "memory-bank" && <MemoryBankPage items={memorizedItems} verseFor={verseFor} onQuiz={startMemoryQuiz} onLibrary={() => navigate("library")} onUpdate={updateLibraryItem} />}
         {page === "history" && <HistoryPage history={history} verseFor={verseFor} />}
-        {page === "terms" && <TermsPage onBack={() => navigate("home")} />}
-        {page === "privacy" && <PrivacyPage onBack={() => navigate("home")} />}
         {page === "settings" && settings && <SettingsPage user={user} settings={settings} onSave={updateSettings} onSignOut={signOut} signingOut={signingOut} onDeleteAccount={deleteAccount} onPreviewTheme={setThemePreview} />}
         {page === "review" && <ReviewPage key={reviewItems[reviewIndex]?.verseId} items={reviewItems} index={reviewIndex} verse={reviewItems[reviewIndex] ? verseFor(reviewItems[reviewIndex].verseId) : undefined} onRate={rate} onClose={() => navigate(reviewReturn)} initialMode={sessionKind === "quiz" ? "impossible" : "easy"} />}
       </main>

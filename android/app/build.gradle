@@ -1,10 +1,21 @@
 apply plugin: 'com.android.application'
 
+def updateSource = (project.findProperty("updateSource") ?: "sideload").toString()
+if (!(updateSource in ["sideload", "play"])) {
+    throw new GradleException("updateSource must be sideload or play")
+}
+
 android {
     namespace = "com.selah.scripturememory"
     compileSdk = rootProject.ext.compileSdkVersion
     buildFeatures {
         buildConfig true
+    }
+    sourceSets {
+        if (updateSource == "play") {
+            debug.manifest.srcFile "src/play/AndroidManifest.xml"
+            release.manifest.srcFile "src/play/AndroidManifest.xml"
+        }
     }
     defaultConfig {
         applicationId "com.selah.scripturememory"
@@ -13,10 +24,10 @@ android {
         // CI passes the workflow run number so every published APK is strictly newer than the last.
         versionCode Integer.parseInt((project.findProperty("appVersionCode") ?: "1").toString())
         versionName (project.findProperty("appVersionName") ?: "1.0").toString()
-        // "sideload" downloads and installs updates in-app; "play" sends the user to the Play Store instead.
+        // "sideload" installs updates in-app; "play" leaves updates to Google Play.
         // The only host the updater will download an APK from.
-        buildConfigField "String", "UPDATE_HOST", '"' + (project.findProperty("updateHost") ?: "ruminate.simmonsweb.com").toString() + '"'
-        buildConfigField "String", "UPDATE_SOURCE", '"' + (project.findProperty("updateSource") ?: "sideload").toString() + '"'
+        buildConfigField "String", "UPDATE_HOST", '"' + (project.findProperty("updateHost") ?: "ruminate.bible").toString() + '"'
+        buildConfigField "String", "UPDATE_SOURCE", '"' + updateSource + '"'
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

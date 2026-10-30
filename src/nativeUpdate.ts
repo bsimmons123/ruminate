@@ -61,12 +61,15 @@ export function useAppUpdate() {
     if (inFlight(stateRef.current) || !shouldCheckForUpdate(Date.now(), readNumber(CHECKED_KEY))) return;
     try {
       info.current = await AppUpdate.getInfo();
+      // GitHub APK releases do not describe availability on a user's Play track.
+      // Let Google Play manage updates instead of prompting for sideload releases.
+      if (info.current.updateSource === "play") { setState({ kind: "hidden" }); return; }
       const latest = await apiLatestRelease();
       writeNumber(CHECKED_KEY, Date.now());
       const release = decideUpdate(latest, info.current.versionCode);
       if (inFlight(stateRef.current)) return;
       setState(release && shouldShowUpdateBanner(release.versionCode!, info.current.versionCode, readNumber(DISMISSED_KEY))
-        ? { kind: "available", release, store: info.current.updateSource === "play" }
+        ? { kind: "available", release, store: false }
         : { kind: "hidden" });
     } catch { /* quiet: offline or the backend is unreachable */ }
   }, []);
