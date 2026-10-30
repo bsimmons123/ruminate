@@ -24,7 +24,7 @@ header nav button.active:after { content:""; height:2px; background:var(--clay);
 .header-actions { display:flex; align-items:center; gap:12px; }
 .streak { border:1px solid var(--line); background:var(--bg-grey-98); border-radius:30px; padding:8px 12px; display:flex; align-items:center; gap:6px; font-size:12px; }
 .streak svg { color:var(--fg-sand-62); fill:var(--fg-sand-62); }
-.avatar { border:0; width:38px; height:38px; border-radius:50%; color:white; background:var(--bg-green-56); font-size:12px; }
+.avatar { border:0; cursor:pointer; width:38px; height:38px; border-radius:50%; color:white; background:var(--bg-green-56); font-size:12px; }
 .menu { display:none; background:none; border:0; }
 main { min-height:calc(100vh - 84px); }
 .page { max-width:1180px; margin:auto; padding:62px 28px 90px; animation:fade .35s ease; }
