@@ -167,3 +167,11 @@ h1,h2,h3,blockquote { font-family:"Gilda Display",serif; font-weight:400; }
 .theme-switch button.active{background:var(--accent-fill);color:var(--accent-ink);opacity:1}
 .library-sync-notice{background:var(--paper);border:1px solid var(--line);color:var(--ink);padding:12px 14px;font-size:12px;margin:18px 0 0}
 .toast-undo{border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;margin-left:14px;padding:0;font-weight:600}
+
+.help-form{max-width:580px;margin:24px 0}
+.help-form fieldset{border:0;padding:0;margin:0;min-width:0;display:grid;gap:18px}
+.help-form label{display:grid;gap:8px;font-size:14px;font-weight:600}
+.help-form input,.help-form select,.help-form textarea{width:100%;min-width:0;font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:12px}
+.help-form textarea{resize:vertical}
+.help-form .primary{justify-self:start}
+.help-form [role=alert]{margin-top:16px}

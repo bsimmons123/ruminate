@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:api": "node --watch server/index.js",
+    "dev:api": "node --env-file-if-exists=.env --watch server/index.js",
     "start": "node server/index.js",
     "build": "tsc -b && vite build",
     "preview": "vite preview",

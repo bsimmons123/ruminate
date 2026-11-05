@@ -7,6 +7,7 @@ export function DeleteAccountPage({ onBack }: { onBack: () => void }) {
     <article className="legal-body">
       <p>You can delete your account from Settings in Ruminate on the web or in the app. Choose “Delete my account,” type your account email, then confirm “Permanently delete.”</p>
       <p>If you no longer have the app or cannot sign in, you can request deletion by email. Send the request from your account email address when possible. We will verify account ownership before deleting any data. Never send your password.</p>
+      <p>You can also use our <a href="/help">help form</a> and choose “Account deletion.”</p>
       <p><a href={requestUrl}>Request account deletion by email</a></p>
       <p>You can also write directly to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> with the subject “Ruminate account deletion request.”</p>
       <h2>What gets deleted</h2>

@@ -201,3 +201,11 @@ npm run test:bible
 ```
 
 Normal builds use committed snapshots and never download Scripture. When changing a bundled text snapshot, increment the Scripture cache version in `public/sw.js`.
+
+## Help form (Web3Forms)
+
+The public `/help` page works without signing in and is linked from sign-in, Settings, and the native More menu. Configure a Web3Forms form whose destination is `help@ruminate.bible`, then set `WEB3FORMS_ACCESS_KEY` in the server/deployment `.env`. Both Compose configurations pass this value to the app. Recreate the app container after changing it; no frontend or mobile rebuild is needed. For local development, restart `npm run dev:api`.
+
+The public `/api/support-config` endpoint exposes the form access key (Web3Forms keys are designed to be public). Submissions go directly from the client to Web3Forms without account tokens, passwords, or practice data. Without a key or a reachable configuration endpoint, the page offers the help email instead.
+
+Before publishing, choose the form’s submission retention period in Web3Forms and enable the spam controls available on your plan. If restricting trusted origins, include the website and verify native app origins (`https://localhost` on Android, `capacitor://localhost` on iOS). Test a real submission and delivery to the help inbox after configuring the key. Account deletion requests still require manual ownership verification.

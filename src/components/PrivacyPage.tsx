@@ -2,14 +2,14 @@
    submission that creates accounts, and this doubles as the in-app copy.
    Shares its operator constants with the Terms page. */
 
-import { CONTACT_EMAIL, EFFECTIVE, OPERATOR, SERVICE } from "./legal";
+import { CONTACT_EMAIL, OPERATOR, SERVICE } from "./legal";
 
 export function PrivacyPage({ onBack }: { onBack: () => void }) {
   return <div className="page legal-page">
     <section className="page-title">
       <p className="eyebrow">Legal</p>
       <h1>Privacy Policy</h1>
-      <p>Effective {EFFECTIVE}</p>
+      <p>Effective November 5, 2026</p>
     </section>
 
     <article className="legal-body">
@@ -27,6 +27,7 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
       <p><strong>Reminder registration.</strong> If you turn on daily reminders in the mobile app, we store
       the device's push token and its time zone. The time zone is used only to send the reminder at
       9&nbsp;a.m. where you are.</p>
+      <p><strong>Help requests.</strong> If you contact us, we receive your email address, message, and the request category you choose so we can respond and resolve your request.</p>
       <p><strong>Ordinary server logs.</strong> Our hosting provider records standard request information,
       including IP address, as part of operating and securing the service.</p>
       <p>We do not collect location, contacts, photos, health data, or device identifiers for advertising.
@@ -47,6 +48,7 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
       <p><strong>Apple and Google (push notifications).</strong> If you enable reminders, delivery goes
       through Apple Push Notification service on iOS or Firebase Cloud Messaging on Android. They receive
       the device token and the notification content needed to deliver it.</p>
+      <p><strong>Web3Forms (help form).</strong> When you submit the help form, your device sends your email address, message, and request category directly to Web3Forms for delivery to our help inbox. Web3Forms also receives connection information such as your IP address to process the request and prevent abuse. See the <a href="https://web3forms.com/privacy">Web3Forms privacy policy</a>. You can contact us directly by email instead.</p>
       <p><strong>Hosting and infrastructure.</strong> Our hosting and network providers process data on our
       behalf in order to run the service.</p>
       <p>We do not share your information with anyone else, and we do not sell it to anyone for any purpose.
@@ -76,6 +78,8 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
         device is cleared. Deleted data cannot be recovered. Ordinary server logs may persist for a short
         period as part of routine operations and backups.
       </p>
+
+      <p>Help correspondence is retained separately from your practice data as needed to respond to and resolve requests. Copies may remain in our email inbox and in Web3Forms according to the form’s configured retention period. Deleting your Ruminate account does not automatically remove those copies; contact us to request their deletion.</p>
 
       <h2>7. Your rights</h2>
       <p>If you cannot sign in or no longer have the app, <a href="/delete-account">request account deletion on our website</a>. Offline copies on other devices can be removed by clearing Ruminate’s storage on those devices. Revoked-session records are retained until the session expires to prevent reuse.</p>

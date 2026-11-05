@@ -31,6 +31,12 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: "256kb" })); app.use(cookieParser());
 
+// The Web3Forms access key is public and identifies the destination form.
+app.get("/api/support-config", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ accessKey: process.env.WEB3FORMS_ACCESS_KEY?.trim() || "" });
+});
+
 function safeUser(row) { return { id: row.id, name: row.name, email: row.email, createdAt: row.created_at }; }
 function setSession(req, res, user) { const token = jwt.sign({ sub: user.id, jti: randomUUID() }, jwtSecret, { expiresIn: "30d" }); if (req.get("X-Ruminate-Native") === "true") return { ...safeUser(user), token }; res.cookie("selah_session", token, { httpOnly: true, sameSite: "lax", secure: process.env.COOKIE_SECURE === "true", maxAge: 30 * 86400000 }); return safeUser(user); }
 function sessionHash(token) { return createHash("sha256").update(token).digest("hex"); }

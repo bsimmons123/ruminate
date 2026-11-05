@@ -61,7 +61,7 @@ Deploy the web changes before submitting these URLs:
 
 The deletion page explains self-service deletion in Settings and provides an email
 request path for people without app access. Requests go to
-`bsimmons@simmonsweb.com` and require manual ownership verification and processing.
+`help@ruminate.bible` and require manual ownership verification and processing.
 Do not delete an account based solely on an unverified email request.
 
 The existing deletion API removes the user row; database foreign keys cascade to
