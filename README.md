@@ -68,7 +68,7 @@ The Android app checks for a newer release when it opens or resumes (at most eve
 ### Native push reminders
 
 - Android: add your Firebase project's `google-services.json` at `android/app/google-services.json` (ignored by Git). Give the API a Firebase service account through `FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS`.
-- iOS: enable Push Notifications for the `com.ruminate.bible` App ID and sign the Xcode project. Set `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`, and `APNS_BUNDLE_ID` on the API. Set `APNS_SANDBOX=true` for development builds and `false` for production builds.
+- iOS: enable Push Notifications for the `com.bible.ruminate` App ID and sign the Xcode project. Set `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`, and `APNS_BUNDLE_ID` on the API. Set `APNS_SANDBOX=true` for development builds and `false` for production builds.
 - In the native app, sign in and enable **Daily reminders** in Settings. The device registers its token and time zone with Ruminate. The API checks once per minute and sends one reminder at 9 a.m. local time when a verse is due. Turning reminders off or signing out removes that device's token. Push requires a real configured device and provider credentials; the iOS simulator cannot receive APNs push.
 
 Keep Firebase and Apple keys outside source control. The browser and PWA show the reminder toggle as unavailable because this implementation uses native push.
@@ -176,7 +176,7 @@ Mark a verse as memorized in My Library, or reach stage 6 with at least 90% accu
 
 ## Rename compatibility
 
-Android and iOS releases use `com.ruminate.bible`. Earlier builds used `com.selah.scripturememory`; the new identifier installs as a separate app, and users must sign in to restore synced data. Unsynced local data does not transfer, so sync the old app before switching. Register the new iOS App ID and update signing/provisioning profiles and the production `APNS_BUNDLE_ID` to match. Signing keys, saved-data keys, database names, and Compose deployment identity are retained. Production mobile builds connect to `https://ruminate.bible`. New container images are published under `ghcr.io/bsimmons123/ruminate`.
+Android and iOS releases use `com.bible.ruminate`. Earlier builds used `com.selah.scripturememory`; the new identifier installs as a separate app, and users must sign in to restore synced data. Unsynced local data does not transfer, so sync the old app before switching. Register the new iOS App ID and update signing/provisioning profiles and the production `APNS_BUNDLE_ID` to match. Signing keys, saved-data keys, database names, and Compose deployment identity are retained. Production mobile builds connect to `https://ruminate.bible`. New container images are published under `ghcr.io/bsimmons123/ruminate`.
 
 Container publication builds AMD64 on `ubuntu-24.04` and ARM64 on `ubuntu-24.04-arm`. Each image must load Node and the server dependencies on its native runner before the combined `latest` and commit tags are published. This avoids running Node under QEMU during dependency installation.
 

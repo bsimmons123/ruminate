@@ -1,4 +1,4 @@
-package com.ruminate.bible;
+package com.bible.ruminate;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;

@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.ruminate.bible",
+  appId: "com.bible.ruminate",
   appName: "Ruminate",
   webDir: "dist",
   android: { allowMixedContent: (process.env.RUMINATE_MOBILE_DEV_HTTP || process.env.SELAH_MOBILE_DEV_HTTP) === "true" },

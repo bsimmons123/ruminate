@@ -50,8 +50,8 @@ jobs:
           const raw = process.env.ANDROID_GOOGLE_SERVICES_JSON;
           if (!raw) throw new Error('Set ANDROID_GOOGLE_SERVICES_JSON to the Firebase Android app configuration');
           const config = JSON.parse(raw);
-          if (!config.client?.some(client => client.client_info?.android_client_info?.package_name === 'com.ruminate.bible')) {
-            throw new Error('Firebase configuration must include com.ruminate.bible');
+          if (!config.client?.some(client => client.client_info?.android_client_info?.package_name === 'com.bible.ruminate')) {
+            throw new Error('Firebase configuration must include com.bible.ruminate');
           }
           writeFileSync('android/app/google-services.json', raw, { mode: 0o600 });
           JS

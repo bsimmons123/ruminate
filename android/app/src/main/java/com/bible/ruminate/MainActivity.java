@@ -1,4 +1,4 @@
-package com.ruminate.bible;
+package com.bible.ruminate;
 
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;

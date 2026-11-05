@@ -1,4 +1,4 @@
-package com.ruminate.bible;
+package com.bible.ruminate;
 
 import android.app.PendingIntent;
 import android.content.Intent;

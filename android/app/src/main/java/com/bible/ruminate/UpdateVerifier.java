@@ -1,4 +1,4 @@
-package com.ruminate.bible;
+package com.bible.ruminate;
 
 import java.io.File;
 import java.io.FileInputStream;

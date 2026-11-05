@@ -1,6 +1,6 @@
 # Google Play release
 
-Ruminate uses the Android package ID `com.ruminate.bible`. Play builds use
+Ruminate uses the Android package ID `com.bible.ruminate`. Play builds use
 `-PupdateSource=play`: the merged manifest removes APK installation permissions and
 the install receiver, the native plugin refuses APK installation, and the app does
 not check GitHub for updates. Google Play manages updates. The default build still
@@ -18,7 +18,7 @@ Required repository secrets:
 - `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and
   `ANDROID_KEY_PASSWORD`: the existing Android signing secrets.
 - `ANDROID_GOOGLE_SERVICES_JSON`: the complete Firebase `google-services.json`
-  configuration for Android package `com.ruminate.bible`. Do not put a
+  configuration for Android package `com.bible.ruminate`. Do not put a
   Firebase Admin service-account key here. The backend also needs its existing
   Firebase Admin configuration for reminder delivery.
 
@@ -51,11 +51,11 @@ for an AAB.
 ## Configure Play App Signing
 
 Earlier sideload builds used `com.selah.scripturememory`. The new package
-`com.ruminate.bible` installs as a separate app even when signed with the same key.
+`com.bible.ruminate` installs as a separate app even when signed with the same key.
 Users must sync the old app before switching, then sign in to restore server data;
-unsynced local data does not transfer automatically. The iOS bundle ID also changes to `com.ruminate.bible`; update Apple signing and APNs configuration for that App ID.
+unsynced local data does not transfer automatically. The iOS bundle ID also changes to `com.bible.ruminate`; update Apple signing and APNs configuration for that App ID.
 
-For future sideload and Play builds of `com.ruminate.bible` to update one another,
+For future sideload and Play builds of `com.bible.ruminate` to update one another,
 supply the existing signing key when enrolling in Play App Signing. Signing the
 uploaded AAB with that key alone does not control the key Google uses for delivered
 APKs. Keep the original key backed up; a separate upload key can be configured later.
