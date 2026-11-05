@@ -1,4 +1,4 @@
-package com.getcapacitor.myapp;
+package com.ruminate.bible;
 
 import static org.junit.Assert.*;
 

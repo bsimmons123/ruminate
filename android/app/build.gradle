@@ -6,7 +6,7 @@ if (!(updateSource in ["sideload", "play"])) {
 }
 
 android {
-    namespace = "com.selah.scripturememory"
+    namespace = "com.ruminate.bible"
     compileSdk = rootProject.ext.compileSdkVersion
     buildFeatures {
         buildConfig true
@@ -18,7 +18,7 @@ android {
         }
     }
     defaultConfig {
-        applicationId "com.selah.scripturememory"
+        applicationId "com.ruminate.bible"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI passes the workflow run number so every published APK is strictly newer than the last.

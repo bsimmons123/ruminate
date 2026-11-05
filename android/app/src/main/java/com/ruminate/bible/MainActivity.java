@@ -1,4 +1,4 @@
-package com.selah.scripturememory;
+package com.ruminate.bible;
 
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;

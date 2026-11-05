@@ -1,4 +1,4 @@
-package com.selah.scripturememory;
+package com.ruminate.bible;
 
 import java.io.File;
 import java.io.FileInputStream;

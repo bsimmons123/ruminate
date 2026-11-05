@@ -30,7 +30,7 @@ services:
       APNS_KEY_P8: ${APNS_KEY_P8:-}
       APNS_KEY_ID: ${APNS_KEY_ID:-}
       APNS_TEAM_ID: ${APNS_TEAM_ID:-}
-      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-com.selah.scripturememory}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-com.ruminate.bible}
       APNS_SANDBOX: ${APNS_SANDBOX:-false}
     ports:
       - "3001:3001"

@@ -1,4 +1,4 @@
-package com.selah.scripturememory;
+package com.ruminate.bible;
 
 import android.app.PendingIntent;
 import android.content.Intent;
@@ -27,7 +27,7 @@ import java.util.concurrent.Executors;
  */
 @CapacitorPlugin(name = "AppUpdate")
 public class AppUpdatePlugin extends Plugin {
-    private static final String PACKAGE_NAME = "com.selah.scripturememory";
+    private static final String PACKAGE_NAME = BuildConfig.APPLICATION_ID;
     private static AppUpdatePlugin current;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
 

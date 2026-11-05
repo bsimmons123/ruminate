@@ -1,4 +1,4 @@
-package com.selah.scripturememory;
+package com.ruminate.bible;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -7,7 +7,7 @@ import android.content.pm.PackageInstaller;
 
 /** Receives the PackageInstaller outcome and hands it to the web layer. */
 public class InstallResultReceiver extends BroadcastReceiver {
-    static final String ACTION = "com.selah.scripturememory.INSTALL_RESULT";
+    static final String ACTION = BuildConfig.APPLICATION_ID + ".INSTALL_RESULT";
 
     @Override
     public void onReceive(Context context, Intent intent) {

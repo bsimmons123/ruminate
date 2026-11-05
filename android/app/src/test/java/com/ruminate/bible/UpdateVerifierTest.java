@@ -1,4 +1,4 @@
-package com.selah.scripturememory;
+package com.ruminate.bible;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
