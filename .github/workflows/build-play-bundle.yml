@@ -1,6 +1,9 @@
 name: Build Google Play bundle
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version_code:
@@ -23,6 +26,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Resolve release version
+        id: version
+        env:
+          INPUT_VERSION_CODE: ${{ inputs.version_code }}
+          INPUT_VERSION_NAME: ${{ inputs.version_name }}
+        run: node scripts/resolve-play-version.mjs
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -48,8 +57,8 @@ jobs:
           JS
       - name: Build and sign Play bundle
         env:
-          VERSION_CODE: ${{ inputs.version_code }}
-          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -74,6 +83,6 @@ jobs:
           (cd play-artifact && sha256sum ruminate-play.aab > ruminate-play.aab.sha256)
       - uses: actions/upload-artifact@v4
         with:
-          name: ruminate-play-${{ inputs.version_code }}
+          name: ruminate-play-${{ steps.version.outputs.code }}
           path: play-artifact/
           if-no-files-found: error

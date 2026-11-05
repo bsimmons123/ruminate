@@ -8,7 +8,8 @@ supports sideload distribution.
 
 ## Build the upload artifact
 
-The manual **Build Google Play bundle** GitHub Actions workflow produces a signed
+The **Build Google Play bundle** GitHub Actions workflow runs on version tags such as
+`v1.0.0` and can also be started manually. It produces a signed
 `ruminate-play.aab` and checksum as a workflow artifact. It does not upload to Play
 or publish a GitHub Release.
 
@@ -21,7 +22,12 @@ Required repository secrets:
   Firebase Admin service-account key here. The backend also needs its existing
   Firebase Admin configuration for reminder delivery.
 
-Run the workflow with a version name such as `1.0.0` and a unique integer version
+Tagged builds derive the version name from the tag and the version code as
+`major × 1,000,000 + minor × 1,000 + patch` (minor/patch must be at most 999).
+For example, `v1.0.0` produces code `1000000`. Use increasing versions and avoid
+manual codes that overtake future tag versions.
+
+For a manual build, run the workflow with a version name such as `1.0.0` and a unique integer version
 code greater than every code already distributed through Play or sideloading.
 The workflow validates the merged manifest, runs Android unit tests, signs the
 bundle, and verifies its signature. Download the artifact for Play Console.
